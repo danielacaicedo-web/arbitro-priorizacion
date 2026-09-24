@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "expedientes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "squad", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "expedientes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ciclo", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

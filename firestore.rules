@@ -1,0 +1,38 @@
+rules_version = '2';
+
+// Espacio compartido, sin login: cualquiera puede leer, crear y editar.
+// El borrado real está deshabilitado a propósito — en la UI se simula
+// con un modal ("deshabilitado para esta prueba"), y aquí lo negamos
+// también a nivel de base de datos para que no se pueda saltar desde
+// las herramientas de desarrollador.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /expedientes/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['iniciativa', 'autor'])
+                    && request.resource.data.autor is string
+                    && request.resource.data.autor.size() > 0;
+      allow update: if true;
+      allow delete: if false;
+    }
+
+    // Documentos únicos compartidos: el listado manual de otros squads (meta/corpus)
+    // y el orden del podio de priorización (meta/podio).
+    match /meta/{id} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Registro de uso (nombre + acción + timestamp) para medición.
+    // Solo se crea, nunca se edita ni se borra desde el cliente.
+    match /eventos/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['nombre', 'accion', 'timestamp'])
+                    && request.resource.data.nombre is string
+                    && request.resource.data.nombre.size() > 0;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "api/evaluar.js": {
+      "maxDuration": 30
+    },
+    "api/preguntar.js": {
+      "maxDuration": 15
+    }
+  }
+}

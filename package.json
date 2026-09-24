@@ -1,0 +1,15 @@
+{
+  "name": "arbitro-priorizacion",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Árbitro de priorización — Spin. MVP sobre Vercel + Firebase.",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "firebase": "^11.0.0"
+  },
+  "devDependencies": {
+    "vercel": "^37.0.0"
+  }
+}

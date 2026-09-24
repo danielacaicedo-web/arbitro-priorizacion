@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   padding-top:env(safe-area-inset-top,0px);
@@ -632,7 +633,7 @@ footer{border-top:1px solid var(--line);padding:20px;text-align:center;font-size
   </div>
   
   <nav>
-    <button id="nav-inicio" class="on" onclick="ir('inicio')">Nueva evaluación</button>
+    <button id="nav-inicio" class="on" onclick="S.doc='';S.meta={iniciativa:'',squad:'',autor:''};ir('inicio')">Nueva evaluación</button>
     <button id="nav-ini" onclick="ir('ini')">Iniciativas por squad</button>
     <button id="nav-exp" onclick="ir('exp')">Tablero de priorización</button>
   </nav>
@@ -645,6 +646,50 @@ footer{border-top:1px solid var(--line);padding:20px;text-align:center;font-size
   Árbitro de priorización · Spin
 </footer>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+/* ============================================================ FIRESTORE
+   Espacio único compartido, sin login. Reemplaza el localStorage anterior:
+   cualquiera que abra la app ve los mismos datos, en cualquier equipo. */
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+/* Firestore no acepta valores undefined — los quita antes de guardar (JSON los descarta solo). */
+const limpio=o=>JSON.parse(JSON.stringify(o));
+const Fire={
+  ok:true,
+  guardarExpediente(exp){
+    if(!exp)return;
+    db.collection("expedientes").doc(exp.id).set(limpio(exp),{merge:true})
+      .then(()=>{Fire.ok=true;}).catch(()=>{Fire.ok=false;render();});
+  },
+  guardarCorpus(items){
+    db.collection("meta").doc("corpus").set(limpio({items:items||[]}))
+      .then(()=>{Fire.ok=true;}).catch(()=>{Fire.ok=false;render();});
+  },
+  guardarPodio(ids){
+    db.collection("meta").doc("podio").set(limpio({orden:ids||[]}))
+      .then(()=>{Fire.ok=true;}).catch(()=>{Fire.ok=false;render();});
+  },
+  logEvento(nombre,accion,expedienteId){
+    db.collection("eventos").add({nombre:nombre||"",accion,expedienteId:expedienteId||null,
+      timestamp:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+  },
+  escucharExpedientes(cb){
+    return db.collection("expedientes").orderBy("fecha","desc")
+      .onSnapshot(snap=>cb(snap.docs.map(d=>d.data())),()=>{Fire.ok=false;render();});
+  },
+  escucharCorpus(cb){
+    return db.collection("meta").doc("corpus")
+      .onSnapshot(snap=>cb((snap.data()||{}).items||[]),()=>{Fire.ok=false;render();});
+  },
+  escucharPodio(cb){
+    return db.collection("meta").doc("podio")
+      .onSnapshot(snap=>cb((snap.data()||{}).orden||null),()=>{Fire.ok=false;render();});
+  }
+};
+</script>
 <script>
 /* ============================================================
    Árbitro de priorización — Spin · Háptica · v0.2
@@ -1050,11 +1095,11 @@ function responderLocal(pregunta,exp){
   if(/sem[áa]foro|color|rojo|amarillo|verde|morado|naranja/.test(q))
     return "El semáforo mide qué tan sólida está la sustentación, no qué tan prioritaria es la iniciativa. Morado quiere decir que está lista para que la mesa la discuta; naranja, que falta información que ya te nombré; gris, que todavía no puedo evaluarla.";
   if(/vara|criterio|c[óo]mo eval[úu]as|de d[óo]nde sacas/.test(q))
-    return "Mido seis cosas: a qué objetivo de negocio le pega y cuánto pesa, con qué evidencia se sostiene, qué KPI mueve y con qué target, cómo sale por fases, quién más tiene que entrar, y si diferencia frente al mercado. La vara está calibrada contra PRDs reales de Spin, no contra una plantilla genérica.";
+    return "Mido seis cosas: a qué objetivo de negocio le pega y cuánto pesa, con qué evidencia se sostiene, qué KPI mueve y con qué target, cómo sale por fases, quién más tiene que entrar, y si diferencia frente al mercado. La vara está calibrada contra iniciativas reales de Spin, no contra una plantilla genérica.";
   if(/qui[ée]n eres|qu[ée] haces|para qu[ée] sirves/.test(q))
     return "Leo tu iniciativa antes de que la lleves a la mesa, te digo qué le falta citando tus propias frases y te hago las preguntas que te van a hacer allá. No decido nada.";
   if(/ayuda|c[óo]mo lo arreglo|qu[ée] escribo|escr[íi]belo/.test(q))
-    return "No te lo escribo: si yo redacto tu PRD, dejo de poder auditarlo. Lo que sí hago es mostrarte un ejemplo de cómo se ve ese criterio bien resuelto, para que veas el nivel de concreción que hace falta. Vuelve a la lectura y lo encuentras debajo del criterio.";
+    return "No te lo escribo: si yo redacto tu iniciativa, dejo de poder auditarla. Lo que sí hago es mostrarte un ejemplo de cómo se ve ese criterio bien resuelto, para que veas el nivel de concreción que hace falta. Vuelve a la lectura y lo encuentras debajo del criterio.";
   return "No sé responder eso con lo que tengo. Lo que sí puedo: explicarte por qué marqué cualquiera de los seis criterios —escribe el nombre del criterio— o por qué el semáforo quedó como quedó.";
 }
 
@@ -1182,43 +1227,24 @@ Si faltan problema, usuario u objetivo de negocio, marca no_evaluable.
 Hablas en español neutro y cercano, sin tecnicismos. Eres exigente, no complaciente.
 Respondes SIEMPRE solo con JSON válido, sin markdown.`;
 
-async function evaluarConModelo(txt,key){
-  const r=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",
-    headers:{"Content-Type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1400,system:SYSTEM,
-      messages:[{role:"user",content:`Evalúa esta iniciativa. JSON:
-{"no_evaluable":bool,"minimos_faltantes":[],"criterios":[{"id":"c1","nombre":"Alineación","estado":"","cita":"","nota":""}],"preguntas":[{"id":"p1","criterio":"c3","origen":"generada","texto":""}],"dependencias":[{"tipo":"","iniciativa":"","squad":"","nota":""}],"cobertura":""}
-Entre 3 y 5 preguntas, solo para criterios débiles o ausentes.
-INICIATIVAS DECLARADAS:
-${corpusActual().map(i=>i.id+" | "+i.squad+" | "+i.nombre+" | "+i.objetivo).join("\n")}
-DOCUMENTO:
-${txt}`}]})});
+/* Evaluación vía función serverless (Vercel → OpenRouter). La key nunca vive en el cliente. */
+async function evaluarConModelo(txt){
+  const r=await fetch("/api/evaluar",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({txt,corpus:corpusActual()})});
   if(!r.ok)throw new Error("sin respuesta");
-  const d=await r.json();
-  const t=d.content.filter(b=>b.type==="text").map(b=>b.text).join("");
-  const c=t.replace(/```json|```/g,"").trim();
-  return JSON.parse(c.slice(c.indexOf("{"),c.lastIndexOf("}")+1));
+  return await r.json();
 }
 
-/* ============================================================ ESTADO */
-const LLAVE="arbitro.spin.datos.v1";
-const Disco={ok:true,
-  leer(){try{const r=localStorage.getItem(LLAVE);return r?JSON.parse(r):null;}catch(e){Disco.ok=false;return null;}},
-  escribir(d){try{localStorage.setItem(LLAVE,JSON.stringify(d));return true;}catch(e){Disco.ok=false;return false;}},
-  borrar(){try{localStorage.removeItem(LLAVE);}catch(e){}}
-};
-let S={verLista:false,verLey:false,sq:"",podio:null,arrastrando:null,busca:"",vsq:"todas",viendo:null,docHtml:"",vista:"inicio",doc:"",exp:null,key:"",expedientes:[],corpus:[],corpusEjemplo:false,orden:"fecha",filtro:"todas",
+/* ============================================================ ESTADO
+   Vive en Firestore (espacio compartido, sin login). S.expedientes/S.corpus/S.podio
+   se mantienen sincronizados en vivo por los listeners que arrancan al final del archivo. */
+let S={verLey:false,sq:"",podio:null,arrastrando:null,busca:"",vsq:"todas",viendo:null,docHtml:"",vista:"inicio",doc:"",exp:null,expedientes:[],corpus:[],orden:"fecha",filtro:"todas",
        meta:{iniciativa:"",squad:"",autor:""},aviso:"",fase:"",comparando:null,editando:null};
 function corpusActual(){return S.corpus||[];}
-function persistir(){
-  const ok=Disco.escribir({v:1,expedientes:S.expedientes,corpus:S.corpus,corpusEjemplo:S.corpusEjemplo,meta:S.meta,podio:S.podio});
-  if(!ok&&!S.aviso)S.aviso="No pude guardar este expediente en el equipo. Descárgalo si quieres conservarlo.";
-}
-function restaurar(){
-  const d=Disco.leer();
-  if(d){S.expedientes=d.expedientes||[];S.corpus=d.corpus||[];S.corpusEjemplo=!!d.corpusEjemplo;S.meta=d.meta||S.meta;S.podio=d.podio||null;}
-}
+/* Guarda el expediente indicado (o S.exp si no se pasa ninguno) en Firestore. */
+function guardarExp(exp){Fire.guardarExpediente(exp||S.exp);}
+function guardarCorpusFn(){Fire.guardarCorpus(S.corpus);}
+function guardarPodioFn(){Fire.guardarPodio(S.podio);}
 function norm(s){return (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9 ]/g,"").trim();}
 function nombreExp(meta,fecha,version){
   return [meta.squad||"Sin squad",meta.iniciativa||"Iniciativa sin nombre",fecha,"v"+version].join(" · ");
@@ -1239,31 +1265,8 @@ function versionDe(iniciativa){
   return prev.length?Math.max(...prev.map(e=>e.version||1))+1:1;
 }
 
-function expEjemplo(id,nombre,iniciativa,version,fecha,prd,extra){
-  const e=evaluarLocal(prd,[]);
-  const sem=semaforoDe(e.criterios,e.noEvaluable);
-  const puntaje=puntajeDe(e.criterios,e.admisibilidad);
-  const prioridad=prioridadDe(prd,e.criterios);
-  return Object.assign({id,nombre,iniciativa,version,fecha,prd,ejemplo:true,
-    squad:(nombre.split(" · ")[0]||""),autor:"PM del squad",ciclo:"Borrador",ejemplos:{},hilo:[],
-    admisibilidad:e.admisibilidad,minimos:e.minimos,noEvaluable:e.noEvaluable,
-    criterios:e.criterios,dependencias:e.dependencias,cobertura:e.cobertura,
-    preguntas:preguntasDe(e.criterios),cambios:[],votos:{},semaforo:sem,puntaje,prioridad,
-    lectura:lecturaDe(e.criterios,sem),cerrado:true},extra||{});
-}
-function cargarEjemplos(){
-  S.corpus=CORPUS_EJEMPLO.slice();S.corpusEjemplo=true;
-  S.expedientes=[
-    expEjemplo("e1","Card Experience · Alertas de consumo · 2026-09-08 · v1","Alertas de consumo",1,"2026-09-08",PRD_V1),
-    expEjemplo("e2","Card Experience · Alertas de consumo · 2026-09-12 · v2","Alertas de consumo",2,"2026-09-12",PRD_V2),
-    expEjemplo("e3","Money Movement · Límites dinámicos · 2026-09-03 · v1","Límites dinámicos",1,"2026-09-03",PRD_MM,
-      {votos:{c2:{v:"no",motivo:"El volumen está en el tablero de Operaciones, no hace falta repetirlo aquí."}}})
-  ].concat(S.expedientes);
-  persistir();render();
-}
 function borrarTodo(){
-  if(!confirm("Se borran los expedientes y las iniciativas guardadas en este equipo. ¿Seguro?"))return;
-  S.expedientes=[];S.corpus=[];S.corpusEjemplo=false;S.exp=null;Disco.borrar();ir("inicio");
+  alert("Borrar el tablero está deshabilitado para esta prueba.");
 }
 
 const $=s=>document.querySelector(s);
@@ -1383,17 +1386,18 @@ function vInicio(){
     <div>
       <span class="kicker">Desde la idea hasta la mesa <b>·</b> Spin</span>
       <h1>Trae tu idea como esté y te digo qué le falta</h1>
-      <p>No hace falta que sea un PRD terminado. Escribe tu iniciativa como la contarías en voz alta,
+      <p>No hace falta que esté terminada. Escribe tu iniciativa como la contarías en voz alta,
       aunque esté a medias, y te digo qué tiene, qué le falta y qué preguntas responder para
-      completarla. La vara sale de los PRD reales de Spin. No decido si se hace ni en qué orden:
-      eso sigue siendo de la mesa. Lo que hago es ayudarte a que llegue completa.</p>
+      completarla. La vara sale del estándar real de Spin. No decido si se hace ni en qué orden:
+      eso sigue siendo de la mesa. Lo que hago es ayudarte a visualizar su prioridad para que la
+      decisión sea más fácil de tomar.</p>
     </div>
     <div class="heroArt">${ILUS.hero()}</div>
   </div>
   <div class="comofunciona">
     <div class="cf-h"><b>Cómo funciona</b><span>Tres pasos, menos de diez minutos</span></div>
     <div class="pasos">
-      <div class="paso">${ILUS.leer()}<i>Paso 1 · Lectura</i><b>Leo tu documento</b><span>Reviso los quince puntos que Spin necesita ver en una iniciativa y te digo cuáles ya tienes, cuáles están a medias y cuáles faltan.</span></div>
+      <div class="paso">${ILUS.leer()}<i>Paso 1 · Lectura</i><b>Leo tu documento</b><span>Reviso los seis criterios que Spin usa para priorizar una iniciativa y te digo cuáles ya tienes, cuáles están a medias y cuáles faltan.</span></div>
       <div class="paso">${ILUS.preguntar()}<i>Paso 2 · Preguntas</i><b>Te pregunto lo que preguntará la mesa</b><span>Las preguntas clave para completar lo que falta. Respóndelas y tu iniciativa crece con ellas.</span></div>
       <div class="paso">${ILUS.acta()}<i>Paso 3 · Informe</i><b>Te entrego el informe</b><span>Calificación final, prioridad estimada y una página lista para llevar a la mesa, o para seguir trabajando.</span></div>
     </div>
@@ -1406,7 +1410,7 @@ function vInicio(){
       <label>Responsable<input value="${esc(S.meta.autor)}" placeholder="Tu nombre" oninput="S.meta.autor=this.value"></label>
     </div>
     <label for="txt" style="font-weight:600;font-size:13.5px;display:block;margin:16px 0 8px">
-      Cuenta tu iniciativa. Como la tengas: una idea suelta, media página o un PRD completo</label>
+      Cuenta tu iniciativa. Como la tengas: una idea suelta, media página o algo bien desarrollado</label>
     <textarea id="txt" rows="8" placeholder="Qué problema viste, a quién le pasa, qué se te ocurrió hacer… lo que tengas por ahora"
       oninput="S.doc=this.value">${esc(S.doc)}</textarea>
 
@@ -1419,13 +1423,7 @@ function vInicio(){
 
     <div style="display:flex;gap:12px;align-items:center;margin-top:14px;flex-wrap:wrap">
       <button class="btn" onclick="empezar()">Evaluar iniciativa</button>
-      <button class="btn link" onclick="S.doc=PRD_V1;S.meta={iniciativa:'Alertas de consumo en tiempo real',squad:'Card Experience',autor:''};render()">Usar un PRD de ejemplo</button>
-      
-    </div>
-
-    <div id="avanzado" style="display:none;margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
-      <label style="font-size:12px;font-weight:600;color:var(--muted)">Clave de acceso
-        <input type="password" value="${S.key}" oninput="S.key=this.value" style="margin-top:6px"></label>
+      <button class="btn link" onclick="S.doc=PRD_V1;S.meta={iniciativa:'Alertas de consumo en tiempo real',squad:'Card Experience',autor:''};render()">Usar una iniciativa de ejemplo</button>
     </div>
   </div>`;
 }
@@ -1461,7 +1459,7 @@ function critHTML(c,i){
     ${S.exp.ejemplos&&S.exp.ejemplos[c.id]?`<div class="ejemplo">
       <div class="et">Ejemplo genérico · no está escrito para tu iniciativa</div>
       ${esc(EJEMPLO[c.id])}
-      <div class="pie">No te lo redacto: si yo escribo tu PRD, dejo de poder auditarlo. Esto es el nivel de concreción que hace falta.</div></div>`:""}
+      <div class="pie">No te lo redacto: si yo escribo tu iniciativa, dejo de poder auditarla. Esto es el nivel de concreción que hace falta.</div></div>`:""}
   </div>`;
 }
 
@@ -1471,7 +1469,7 @@ function vChat(){
 
   if(S.fase==="leyendo"||!e.criterios){
     return `<div class="split"><div class="thread">
-      ${msg('<h3>Leyendo tu documento</h3><div class="typing"><span></span><span></span><span></span></div><p style="margin-top:10px;color:var(--muted)">Estoy buscando las catorce cosas que un PRD necesita tener, y las frases tuyas en las que me pueda apoyar.</p>')}
+      ${msg('<h3>Leyendo tu documento</h3><div class="typing"><span></span><span></span><span></span></div><p style="margin-top:10px;color:var(--muted)">Estoy revisando los seis criterios de Spin, y las frases tuyas en las que me pueda apoyar.</p>')}
     </div>${docHTML()}</div>`;
   }
   const paso=e.paso||"lectura";
@@ -1503,12 +1501,6 @@ function stepper(){
 
 /* ---------- Momento 1: la lectura ---------- */
 function vLectura(e,msg){
-  const cuenta=n=>({d:(e.admisibilidad||[]).filter(a=>(a.nivel||"esencial")===n&&a.estado==="declarado").length,
-                    i:(e.admisibilidad||[]).filter(a=>(a.nivel||"esencial")===n&&a.estado==="insinuado").length,
-                    f:(e.admisibilidad||[]).filter(a=>(a.nivel||"esencial")===n&&a.estado==="ausente").length,
-                    t:(e.admisibilidad||[]).filter(a=>(a.nivel||"esencial")===n).length});
-  const ce=cuenta("esencial");
-
   let out="";
 
   /* 1. la calificación, lo primero */
@@ -1524,28 +1516,8 @@ function vLectura(e,msg){
     return `${stepper()}<div class="split"><div class="flujo">${out}</div>${docHTML()}</div>`;
   }
 
-  /* 2. inventario del documento, compacto */
-  out+=`<section class="tarjeta">
-    <div class="th">
-      <h3>Qué tiene tu iniciativa hasta ahora</h3>
-      <div class="resumen">
-        <span class="mini-chip s-declarado">${ce.d} claros</span>
-        <span class="mini-chip s-insinuado">${ce.i} a medias</span>
-        <span class="mini-chip s-ausente">${ce.f} sin escribir</span>
-      </div>
-    </div>
-    <p class="leyendita">
-      <b>Claro</b>: está escrito y con detalle suficiente. ·
-      <b>A medias</b>: se menciona de pasada, sin desarrollar. ·
-      <b>Sin escribir</b>: no lo encontré en el documento.
-    </p>
-    <button class="btn link mini" onclick="S.verLista=!S.verLista;render()">
-      ${S.verLista?"Ocultar el detalle":"Ver los "+(e.admisibilidad||[]).length+" puntos uno por uno"}</button>
-    ${S.verLista?`<div class="cols">
-      ${nivelHTML(e,"esencial","Lo que un PRD de Spin tiene que traer","")}
-      ${nivelHTML(e,"mejora","Lo que subiría el estándar","No es práctica habitual en Spin todavía. Si falta, lo anoto, pero no baja la calificación.")}
-    </div>`:""}
-  </section>`;
+  /* 2. prácticas que suman puntos extra (no bajan la calificación si faltan) */
+  out+=nivelHTML(e,"mejora","Prácticas que suman puntos extra","No son obligatorias ni bajan la calificación si faltan. Si ya las tienes, suman hasta 8 puntos.");
 
   /* 3. los seis criterios */
   out+=`<section class="tarjeta">
@@ -1897,7 +1869,7 @@ function soltar(ev,destino){
   const p=S.podio.slice();
   p.splice(p.indexOf(o),1);
   p.splice(p.indexOf(destino),0,o);
-  S.podio=p;S.arrastrando=null;persistir();render();
+  S.podio=p;S.arrastrando=null;guardarPodioFn();render();
 }
 
 /* ---------- Leyenda del tablero ---------- */
@@ -1964,7 +1936,7 @@ function actaHTML(e){
   const votos=Object.entries(e.votos);
   const b=(n,t,c)=>`<div class="bloque"><h3><span class="n">${n}</span>${t}</h3>${c}</div>`;
   return `<div class="acta">
-    <h2>Acta de evaluación</h2>
+    <h2>Informe de evaluación</h2>
     <div class="metaActa">
       <div><span>Iniciativa</span>${esc(e.iniciativa||"Sin nombre")}</div>
       <div><span>Squad</span>${esc(e.squad||"Sin declarar")}</div>
@@ -1979,9 +1951,7 @@ function actaHTML(e){
         const n=e.criterios.find(c=>c.id===k);return `<div style="color:${v.v==="ok"?"var(--verde)":"var(--accent)"};font-size:13px">
         ${v.v==="ok"?"El PM está de acuerdo en "+n.nombre+".":"El PM no está de acuerdo en "+n.nombre+": "+esc(v.motivo)}</div>`;}).join("")+`</div>`:""))}
     ${b("1b","Prioridad estimada",fichaHTML(e))}
-    ${b("2b","Qué trae el documento",`<div class="mini">${(e.admisibilidad||[]).filter(a=>(a.nivel||"esencial")==="esencial").map(a=>`<span class="chip s-${a.estado}">${a.elemento}</span>`).join(" ")}</div>
-      <div style="font-size:12px;color:var(--faint);margin:10px 0 5px">Lo que subiría el estándar</div>
-      <div class="mini">${(e.admisibilidad||[]).filter(a=>a.nivel==="mejora").map(a=>`<span class="chip s-${a.estado}">${a.elemento}</span>`).join(" ")}</div>`)}
+    ${b("2b","Prácticas que suman puntos extra",`<div class="mini">${(e.admisibilidad||[]).filter(a=>a.nivel==="mejora").map(a=>`<span class="chip s-${a.estado}">${a.elemento}</span>`).join(" ")}</div>`)}
     ${b("3a","Preguntas y respuestas",`<div>${(e.preguntas||[]).map(p=>`<div style="margin-bottom:10px"><strong>${esc(p.texto)}</strong><br>${p.nolose?'<span style="color:var(--faint)">El PM declaró que no lo sabe.</span>':(esc(p.respuesta.trim())||'<span style="color:var(--faint)">Sin responder.</span>')}</div>`).join("")}</div>`)}
     ${(e.cambios&&e.cambios.length)?b("3b","Qué pasó con tus respuestas",`<ul>${e.cambios.map(c=>`<li>${esc(c.criterio)}: ${c.de===c.a?"sigue en "+c.a:"de "+c.de+" a "+c.a}. ${esc(c.porque)}</li>`).join("")}</ul>`):""}
     ${(e.hilo&&e.hilo.length)?b("+","Lo que el PM preguntó",`<ul>${e.hilo.filter(m=>m.rol==="pm").map(m=>`<li>${esc(m.texto)}</li>`).join("")}</ul>`):""}
@@ -1991,16 +1961,15 @@ function actaHTML(e){
     <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
       <button class="btn" onclick="guardar()">Guardar en el tablero</button>
       <button class="btn sec" onclick="imprimirActa()">Imprimir o guardar en PDF</button>
-      <button class="btn sec" onclick="copiarActa()">Copiar el acta</button>
-      <button class="btn link" onclick="descargarActa()">Guardar el acta</button>
-      <button class="btn link" onclick="descargar()">Guardar el expediente</button>
+      <button class="btn sec" onclick="copiarActa()">Copiar el informe</button>
+      <button class="btn link" onclick="descargarActa()">Descargar el informe</button>
     </div></div>`;
 }
 
 function vExp(){
   return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
     <h1 class="tituloV" style="font-size:24px;letter-spacing:-.02em">Tablero de priorización</h1>
-    <span style="font-size:13.5px;color:var(--muted)">Todos los PRD que has pasado, con su calificación y su prioridad estimada.</span></div>
+    <span style="font-size:13.5px;color:var(--muted)">Todas las iniciativas que has evaluado, con su calificación y su prioridad estimada, para ayudarte a decidir qué priorizar.</span></div>
   ${leyendaHTML()}
   ${matrizHTML()}
   ${podioHTML()}
@@ -2020,9 +1989,7 @@ function vExp(){
         <option value="calif" ${S.orden==="calif"?"selected":""}>calificación</option>
         <option value="prior" ${S.orden==="prior"?"selected":""}>prioridad estimada</option>
       </select></label>
-    <label class="btn sec" style="cursor:pointer">Cargar un PRD evaluado
-      <input type="file" accept=".json" style="display:none" onchange="importar(this.files[0])"></label>
-    <button class="btn link" onclick="S.doc='';ir('inicio')">Evaluar un PRD nuevo</button></div>
+    <button class="btn link" onclick="S.doc='';S.meta={iniciativa:'',squad:'',autor:''};ir('inicio')">Evaluar una iniciativa nueva</button></div>
   ${S.expedientes.length?ordenados().map(e=>{
     const otras=S.expedientes.filter(o=>o.iniciativa===e.iniciativa&&o.id!==e.id&&o.criterios);
     const tieneP=typeof e.puntaje==="number";
@@ -2047,23 +2014,22 @@ function vExp(){
           <button class="btn link" onclick="verFicha2('${e.id}')">Leer</button>
           <button class="btn link" onclick="abrir('${e.id}')">Abrir y editar</button>
           <button class="btn link" onclick="nuevaVersion('${e.id}')">Nueva versión</button>
-          <button class="btn link" onclick="descargarE('${e.id}')">Descargar</button>
           ${otras.length&&e.criterios?`<button class="btn link" onclick="S.comparando=S.comparando==='${e.id}'?null:'${e.id}';render()">Comparar versiones</button>`:""}
         </div>
         ${S.comparando===e.id&&otras.length?vsHTML(otras[0],e):""}
       </div></div>`;}).join("")
     :`<div class="vacio">
         ${ILUS.expedientes()}
-        <h3>Todavía no hay PRD en el tablero</h3>
-        <p>Cada PRD que evalúes queda aquí con su calificación, su prioridad estimada, sus preguntas y su acta.
+        <h3>Todavía no hay iniciativas en el tablero</h3>
+        <p>Cada iniciativa que evalúes queda aquí con su calificación, su prioridad estimada, sus preguntas y su informe.
         Cuando la vuelvas a pasar corregida, se guarda como versión nueva y puedes comparar las dos.</p>
         <div style="display:flex;gap:14px;justify-content:center;margin-top:16px;flex-wrap:wrap">
-          <button class="btn" onclick="ir('inicio')">Evaluar un PRD</button>
+          <button class="btn" onclick="S.doc='';S.meta={iniciativa:'',squad:'',autor:''};ir('inicio')">Evaluar una iniciativa</button>
         </div></div>`}
   <div style="display:flex;justify-content:space-between;gap:16px;margin-top:24px;flex-wrap:wrap;align-items:center">
     <p style="font-size:12.5px;color:var(--faint);max-width:56ch;margin:0">
-      ${Disco.ok?"Tu tablero sigue aquí la próxima vez que abras la herramienta. Descarga un PRD si quieres compartirlo o abrirlo en otro equipo."
-               :"No estoy logrando conservar el tablero en este equipo. Descarga los PRD que necesites guardar."}</p>
+      ${Fire.ok?"Este tablero es compartido: cualquiera con el link ve lo mismo que tú, en tiempo real."
+               :"No estoy logrando conectar con la base de datos ahora mismo. Descarga el informe de lo que necesites conservar."}</p>
     ${S.expedientes.length?`<button class="btn link" onclick="borrarTodo()">Borrar el tablero</button>`:""}
   </div>`;
 }
@@ -2091,43 +2057,62 @@ function kwDe(nombre,objetivo){
 function señasDe(i){return (i.kw&&i.kw.length)?i.kw:kwDe(i.nombre,i.objetivo);}
 function nuevaIniciativa(){
   S.corpus.push({id:"IN-"+(S.corpus.length+1),squad:"",nombre:"",objetivo:"",estado:"En definición",kw:[]});
-  persistir();render();
+  guardarCorpusFn();render();
 }
 function editarIni(idx,campo,valor){
   const i=S.corpus[idx];if(!i)return;
   i[campo]=valor;
   if(campo==="nombre"||campo==="objetivo")i.kw=kwDe(i.nombre,i.objetivo);
-  persistir();
+  guardarCorpusFn();
 }
-function borrarIni(idx){S.corpus.splice(idx,1);persistir();render();}
+function borrarIni(idx){S.corpus.splice(idx,1);guardarCorpusFn();render();}
 function exportarCorpus(){
   const b=new Blob([JSON.stringify(S.corpus,null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="iniciativas-spin.json";a.click();
 }
+function filasDesdeCSV(txt){
+  return txt.split(/\r?\n/).filter(Boolean).map(l=>l.split(/[;,\t]/).map(x=>x.trim().replace(/^"|"$/g,"")));
+}
+function listaDesdeFilas(filas){
+  const cab=(filas[0]||[]).join(" ").toLowerCase();
+  const desde=/squad|iniciativa|nombre|objetivo/.test(cab)?1:0;
+  return filas.slice(desde).filter(c=>c.some(x=>String(x||"").trim())).map((c,n)=>
+    ({id:"IN-"+(n+1),squad:c[0]||"",nombre:c[1]||"",objetivo:c[2]||"",estado:c[3]||"En definición",kw:kwDe(c[1]||"",c[2]||"")}));
+}
 function importarCorpus(f){
-  if(!f)return;const r=new FileReader();
+  if(!f)return;
+  const nombre=f.name.toLowerCase();
+  const r=new FileReader();
+  const avisoError=()=>set({aviso:"No pude leer ese archivo. Necesito una lista con columnas squad, iniciativa, objetivo y estado — en Excel (.xlsx), CSV o JSON. Si tiene varias hojas o un formato distinto, exporta solo la hoja con el listado como CSV e inténtalo de nuevo."});
+  const guardar=lista=>{
+    if(!lista||!lista.length)throw 0;
+    S.corpus=lista;guardarCorpusFn();
+    set({aviso:"Cargué "+lista.length+" iniciativas. A partir de ahora los cruces se buscan contra estas."});
+  };
+  if(nombre.endsWith(".xlsx")||nombre.endsWith(".xls")){
+    r.onload=()=>{
+      try{
+        const wb=XLSX.read(r.result,{type:"array"});
+        const hoja=wb.Sheets[wb.SheetNames[0]];
+        const filas=XLSX.utils.sheet_to_json(hoja,{header:1,raw:false,defval:""});
+        guardar(listaDesdeFilas(filas));
+      }catch(e){avisoError();}
+    };
+    r.readAsArrayBuffer(f);
+    return;
+  }
   r.onload=()=>{
     try{
-      const txt=r.result;
-      let lista;
-      if(f.name.toLowerCase().endsWith(".csv")){
-        const fil=txt.split(/\r?\n/).filter(Boolean);
-        const cab=fil[0].toLowerCase();
-        const desde=/squad|iniciativa|nombre|objetivo/.test(cab)?1:0;
-        lista=fil.slice(desde).map((l,n)=>{
-          const c=l.split(/[;,\t]/).map(x=>x.trim().replace(/^"|"$/g,""));
-          return{id:"IN-"+(n+1),squad:c[0]||"",nombre:c[1]||"",objetivo:c[2]||"",estado:c[3]||"En definición",kw:kwDe(c[1]||"",c[2]||"")};
-        });
+      if(nombre.endsWith(".csv")){
+        guardar(listaDesdeFilas(filasDesdeCSV(r.result)));
       }else{
-        lista=JSON.parse(txt);
+        let lista=JSON.parse(r.result);
         if(!Array.isArray(lista))throw 0;
         lista=lista.map((i,n)=>({id:i.id||"IN-"+(n+1),squad:i.squad||"",nombre:i.nombre||i.name||"",
           objetivo:i.objetivo||i.objective||"",estado:i.estado||"En definición",kw:i.kw||kwDe(i.nombre||i.name||"",i.objetivo||"")}));
+        guardar(lista);
       }
-      if(!lista.length)throw 0;
-      S.corpus=lista;S.corpusEjemplo=false;persistir();
-      set({aviso:"Cargué "+lista.length+" iniciativas. A partir de ahora los cruces se buscan contra estas."});
-    }catch(e){set({aviso:"No pude leer ese archivo. Necesito una lista de iniciativas con squad, nombre, objetivo y estado."});}
+    }catch(e){avisoError();}
   };
   r.readAsText(f);
 }
@@ -2240,9 +2225,8 @@ function vIniciativas(){
   <div style="display:flex;gap:12px;margin:18px 0;flex-wrap:wrap;align-items:center">
     <button class="btn" onclick="nuevaIniciativa()">Añadir iniciativa</button>
     <label class="btn sec" style="cursor:pointer">Importar una lista
-      <input type="file" accept=".json,.csv" style="display:none" onchange="importarCorpus(this.files[0])"></label>
+      <input type="file" accept=".xlsx,.xls,.csv,.json" style="display:none" onchange="importarCorpus(this.files[0])"></label>
     ${n?`<button class="btn link" onclick="exportarCorpus()">Exportar</button>`:""}
-    ${S.corpusEjemplo?`<span class="ej">lista de ejemplo</span>`:""}
   </div>
   ${evaluadasHTML()}
   <h2 class="subt">El registro que cargas a mano</h2>
@@ -2259,19 +2243,19 @@ function vIniciativas(){
   </div>`:`<div class="vacio">
     ${ILUS.iniciativas()}
     <h3>Todavía no hay iniciativas cargadas</h3>
-    <p>Sin esto puedo evaluar tu PRD igual, pero no puedo decirte si choca con lo que está haciendo otro squad.
+    <p>Sin esto puedo evaluar tu iniciativa igual, pero no puedo decirte si choca con lo que está haciendo otro squad.
     Pide a cada PM su lista de iniciativas activas con el objetivo al que responden, y cárgala aquí.</p>
-    <p style="font-size:13px">Puedes cargarla desde un archivo con cuatro columnas: squad, nombre, objetivo y estado.</p>
+    <p style="font-size:13px">Puedes cargarla desde tu Excel de siempre (.xlsx), o desde CSV/JSON — con cuatro columnas: squad, nombre, objetivo y estado.</p>
   </div>`}
   <p style="font-size:12.5px;color:var(--faint);margin-top:20px;max-width:64ch">
-    ${Disco.ok?"Esta lista queda guardada. Si trabajas en otro equipo, expórtala y vuelve a cargarla allá."
-             :"No estoy logrando conservar la lista en este equipo. Expórtala para no perderla."}</p>`;
+    ${Fire.ok?"Esta lista es compartida: la ve cualquiera que entre a la herramienta."
+             :"No estoy logrando conectar con la base de datos ahora mismo. Exporta la lista para no perderla."}</p>`;
 }
 
 /* ---------- Acta: versión completa y exportable ---------- */
 function actaTexto(e){
   const L=[];let n=0;const S_=t=>{n++;L.push("## "+n+". "+t);};
-  L.push("# Acta de evaluación — "+(e.iniciativa||"Iniciativa"));
+  L.push("# Informe de evaluación — "+(e.iniciativa||"Iniciativa"));
   L.push("");
   L.push("- Squad: "+(e.squad||"sin declarar"));
   L.push("- Responsable: "+(e.autor||"sin declarar"));
@@ -2292,11 +2276,8 @@ function actaTexto(e){
   }else L.push((SEM[e.semaforo]||{t:""}).t+". "+(e.lectura||""));
   L.push("Este resultado mide qué tan sólida está la sustentación, no qué tan prioritaria es la iniciativa.");
   L.push("");
-  S_("Qué trae el documento");
-  L.push("Lo que un PRD de Spin tiene que traer:");
-  (e.admisibilidad||[]).filter(a=>(a.nivel||"esencial")==="esencial").forEach(a=>L.push("- "+a.elemento+": "+a.estado));
-  L.push("");
-  L.push("Lo que subiría el estándar (no baja el veredicto):");
+  S_("Prácticas que suman puntos extra");
+  L.push("No son obligatorias ni bajan el veredicto si faltan:");
   (e.admisibilidad||[]).filter(a=>a.nivel==="mejora").forEach(a=>L.push("- "+a.elemento+": "+a.estado));
   L.push("");
   S_("Evaluación criterio por criterio");
@@ -2342,9 +2323,9 @@ function actaTexto(e){
 function copiarActa(){
   const t=actaTexto(S.exp);
   if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(t).then(()=>set({aviso:"Acta copiada. Pégala donde la necesites."}),
-      ()=>set({aviso:"No pude copiar. Descárgala en su lugar."}));
-  }else set({aviso:"No pude copiar el acta. Descárgala y la tienes igual."});
+    navigator.clipboard.writeText(t).then(()=>set({aviso:"Informe copiado. Pégalo donde lo necesites."}),
+      ()=>set({aviso:"No pude copiar. Descárgalo en su lugar."}));
+  }else set({aviso:"No pude copiar el informe. Descárgalo y lo tienes igual."});
 }
 function descargarActa(){
   const b=new Blob([actaTexto(S.exp)],{type:"text/markdown"});
@@ -2353,7 +2334,7 @@ function descargarActa(){
 }
 function imprimirActa(){
   const z=$("#areaImpresion");
-  z.innerHTML=`<h1 style="font-family:var(--display)">Acta de evaluación</h1>
+  z.innerHTML=`<h1 style="font-family:var(--display)">Informe de evaluación</h1>
     <p><strong>${esc(S.exp.iniciativa||"")}</strong><br>${esc(S.exp.squad||"")} · ${esc(S.exp.fecha||"")} · versión ${S.exp.version||1}${S.exp.autor?" · "+esc(S.exp.autor):""}</p>`
     +actaTexto(S.exp).split("\n").slice(7).map(l=>{
       if(l.startsWith("### "))return "<h3>"+esc(l.slice(4))+"</h3>";
@@ -2378,7 +2359,7 @@ function render(){
   $("#nav-exp").className=S.vista==="exp"?"on":"";
   const av=S.aviso?`<div class="aviso">${esc(S.aviso)}</div>`:"";
   $("#main").innerHTML=av+(S.vista==="inicio"?vInicio():S.vista==="chat"?vChat():S.vista==="ini"?vIniciativas():S.vista==="ver"?vVer():vExp());
-  if(S.vista==="inicio"){armarDrop();if(/avanzado/.test(location.search)){const a=$("#avanzado");if(a)a.style.display="block";}}
+  if(S.vista==="inicio")armarDrop();
   }catch(err){console.error(err);$("#main").innerHTML='<div class="aviso">Algo se rompió al dibujar la pantalla. Recarga el archivo y vuelve a intentarlo.</div>';}
 }
 
@@ -2399,22 +2380,17 @@ async function preguntar(){
   S.exp.hilo.push({rol:"pm",texto:t});
   i.value="";
   let r=null;
-  if(S.key.trim()){
-    try{
-      const d=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
-        headers:{"Content-Type":"application/json","x-api-key":S.key.trim(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-        body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:400,
-          system:SYSTEM+" Ahora el PM te está preguntando algo sobre tu evaluación. Responde en dos o tres frases, en español llano, sin JSON. No escribas el PRD por él.",
-          messages:[{role:"user",content:"EVALUACIÓN:\n"+JSON.stringify(S.exp.criterios)+"\n\nPREGUNTA DEL PM: "+t}]})});
-      if(d.ok){const j=await d.json();r=j.content.filter(b=>b.type==="text").map(b=>b.text).join("").trim();}
-    }catch(e){}
-  }
+  try{
+    const d=await fetch("/api/preguntar",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({criterios:S.exp.criterios,pregunta:t})});
+    if(d.ok){const j=await d.json();r=(j.respuesta||"").trim();}
+  }catch(e){}
   S.exp.hilo.push({rol:"agente",texto:r||responderLocal(t,S.exp)});
   sincronizar();render();
   setTimeout(()=>{const q=$("#qbox");if(q)q.focus();},50);
 }
-function fijarEstado(id,v){const e=S.expedientes.find(x=>x.id===id);if(e){e.ciclo=v;if(v==="Borrador")e.decision="";}persistir();render();}
-function fijarDecision(id,v){const e=S.expedientes.find(x=>x.id===id);if(e)e.decision=v;persistir();}
+function fijarEstado(id,v){const e=S.expedientes.find(x=>x.id===id);if(e){e.ciclo=v;if(v==="Borrador")e.decision="";guardarExp(e);Fire.logEvento(e.autor,"priorizar",e.id);}render();}
+function fijarDecision(id,v){const e=S.expedientes.find(x=>x.id===id);if(e){e.decision=v;guardarExp(e);}}
 function nolose(i){const p=S.exp.preguntas[i];p.nolose=!p.nolose;if(p.nolose)p.respuesta="";sincronizar();render();}
 function votar(id,v){
   if(v===null){delete S.exp.votos[id];render();return;}
@@ -2429,23 +2405,24 @@ async function empezar(){
   const hoy=new Date().toISOString().slice(0,10);
   const auto=leerMeta(t);
   const meta={iniciativa:S.meta.iniciativa||auto.iniciativa,squad:S.meta.squad||auto.squad,autor:S.meta.autor||auto.autor};
+  if(!meta.autor.trim()){set({aviso:"Escribe tu nombre completo en “Responsable” antes de evaluar — lo necesito para saber quién hizo esta evaluación."});return;}
   const ver=versionDe(meta.iniciativa);
   S.exp={id:"x"+Date.now(),prdHtml:S.docHtml||"",nombre:nombreExp(meta,hoy,ver),iniciativa:meta.iniciativa,
     squad:meta.squad,autor:meta.autor,version:ver,fecha:hoy,prd:t,votos:{},cambios:[],
     ejemplos:{},hilo:[],ciclo:"Borrador",cerrado:false};
   S.exp.paso="lectura";S.exp.qi=0;
-  S.expedientes.unshift(S.exp);persistir();
+  S.expedientes.unshift(S.exp);guardarExp(S.exp);Fire.logEvento(S.exp.autor,"evaluar",S.exp.id);
   set({vista:"chat",fase:"leyendo",aviso:""});
 
   let r=null;
-  if(S.key.trim()){try{
-    const m=await evaluarConModelo(t,S.key.trim());
+  try{
+    const m=await evaluarConModelo(t);
     const loc=evaluarLocal(t,S.expedientes);
     r={admisibilidad:loc.admisibilidad,minimos:m.minimos_faltantes||[],noEvaluable:!!m.no_evaluable,
        criterios:m.criterios||loc.criterios,dependencias:m.dependencias||loc.dependencias,
        cobertura:m.cobertura||loc.cobertura,
        preguntas:(m.preguntas||[]).map(p=>({...p,respuesta:"",nolose:false}))};
-  }catch(err){}}
+  }catch(err){}
   if(!r){const loc=evaluarLocal(t,S.expedientes);r={...loc,preguntas:preguntasDe(loc.criterios)};}
   if(!r.preguntas||!r.preguntas.length)r.preguntas=preguntasDe(r.criterios);
 
@@ -2467,17 +2444,17 @@ async function revisar(){
   Object.assign(S.exp,{criterios,cambios,semaforo:sem,lectura:lecturaDe(criterios,sem),cerrado:true,paso:"informe"});
   S.exp.puntaje=puntajeDe(criterios,S.exp.admisibilidad);
   S.exp.prioridad=Object.assign(prioridadDe(S.exp.prd+" "+S.exp.preguntas.map(q=>q.respuesta).join(" "),criterios),{impacto:(S.exp.prioridad||{}).impacto||null});
-  sincronizar();set({fase:""});
+  sincronizar();Fire.logEvento(S.exp.autor,"reevaluar",S.exp.id);set({fase:""});
 }
 
 function guardar(){
   const i=S.expedientes.findIndex(e=>e.id===S.exp.id);
   if(i>=0)S.expedientes[i]=S.exp;else S.expedientes.unshift(S.exp);
-  persistir();ir("exp");
+  guardarExp(S.exp);Fire.logEvento(S.exp.autor,"guardar_informe",S.exp.id);ir("exp");
 }
 function sincronizar(){
   const i=S.expedientes.findIndex(e=>e.id===S.exp.id);
-  if(i>=0)S.expedientes[i]=S.exp;persistir();
+  if(i>=0)S.expedientes[i]=S.exp;guardarExp(S.exp);
 }
 function irPaso(k){S.exp.paso=k;sincronizar();render();}
 function marcarPunto(i){
@@ -2509,22 +2486,7 @@ function nuevaVersion(id){
   set({vista:"inicio",aviso:"Cargué el documento de “"+(e.iniciativa||e.nombre)+"”. Edítalo y vuelve a pasarlo: se guarda como versión "+((e.version||1)+1)+" y podrás compararlas."});
 }
 function abrir(id){S.exp=S.expedientes.find(e=>e.id===id);if(!S.exp.paso)S.exp.paso=S.exp.cerrado?"informe":"lectura";ir("chat");}
-function renombrar(id,v){const e=S.expedientes.find(x=>x.id===id);if(e)e.nombre=v;persistir();}
-function bajar(e){
-  const b=new Blob([JSON.stringify(e,null,2)],{type:"application/json"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(b);
-  a.download=e.nombre.replace(/[^\w\-]+/g,"_")+".json";a.click();
-}
-function descargar(){bajar(S.exp);}
-function descargarE(id){bajar(S.expedientes.find(e=>e.id===id));}
-function importar(f){
-  if(!f)return;const r=new FileReader();
-  r.onload=()=>{try{const o=JSON.parse(r.result);
-    if(!o.nombre||!o.criterios||!o.prd)throw 0;
-    o.id="i"+Date.now();S.expedientes.unshift(o);persistir();set({aviso:""});
-  }catch(e){set({aviso:"Ese archivo no es un expediente del Árbitro. Tu lista quedó igual."});}};
-  r.readAsText(f);
-}
+function renombrar(id,v){const e=S.expedientes.find(x=>x.id===id);if(e){e.nombre=v;guardarExp(e);}}
 
 /* ---------- Archivos ---------- */
 function armarDrop(){
@@ -2562,8 +2524,10 @@ async function leerArchivo(f){
   }
 }
 
-restaurar();
 render();
+Fire.escucharExpedientes(lista=>{S.expedientes=lista;render();});
+Fire.escucharCorpus(items=>{S.corpus=items;render();});
+Fire.escucharPodio(ids=>{S.podio=ids;render();});
 </script>
 </body>
 </html>
