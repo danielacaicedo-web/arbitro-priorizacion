@@ -1204,8 +1204,6 @@ ${txt}`}]})});
 /* ============================================================ ESTADO */
 const LLAVE="arbitro.spin.datos.v1";
 const Disco={ok:true,
-const LLAVE="arbitro.spin.datos.v1";
-const Disco={ok:true,
   leer(){try{const r=localStorage.getItem(LLAVE);return r?JSON.parse(r):null;}catch(e){Disco.ok=false;return null;}},
   escribir(d){try{localStorage.setItem(LLAVE,JSON.stringify(d));return true;}catch(e){Disco.ok=false;return false;}},
   borrar(){try{localStorage.removeItem(LLAVE);}catch(e){}}
