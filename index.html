@@ -348,6 +348,9 @@ nav button.on{background:linear-gradient(135deg,#FFFFFF,#F7F2FF)}
 
 
 .filtros{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
+.filtros-grupo{margin-top:6px}
+.filtros-grupo .filtros{margin-top:8px}
+.fg-label{font-size:12px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.02em}
 .fx{background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:8px 15px;font-size:12.5px;
   font-weight:600;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s}
 .fx:hover{border-color:var(--lila)}
@@ -583,6 +586,7 @@ main{padding:34px 26px 90px}
 
 /* ====== Matriz con instrucciones al lado ====== */
 .mgrid{display:grid;grid-template-columns:250px 1fr;gap:22px;align-items:start;margin-top:6px}
+.mgrid.singuia{grid-template-columns:1fr}
 @media(max-width:900px){.mgrid{grid-template-columns:1fr}}
 .minstr{display:flex;flex-direction:column;gap:14px}
 .ins{display:flex;gap:11px;align-items:flex-start}
@@ -1149,12 +1153,14 @@ function estadoDe(e){
   if(typeof e.puntaje!=="number")return{t:"Sin terminar",c:"var(--faint)",c2:"#C9CAD4",bg:"var(--paper)",d:"Quedó a medias. Ábrela para retomarla.",clave:"amedias"};
   const n=nivelDe(e.puntaje);return{t:n.t,c:n.c,c2:n.c2,bg:n.bg,d:n.d,clave:n.clave};
 }
-const FILTROS=[
- {k:"todas",t:"Todas"},
+const FILTROS=[{k:"todas",t:"Todas"}];
+const FILTROS_CALIDAD=[
  {k:"listo",t:"Listas para la mesa"},
  {k:"casi",t:"Casi listas"},
  {k:"construccion",t:"En construcción"},
- {k:"cruda",t:"Todavía son ideas"},
+ {k:"cruda",t:"Todavía son ideas"}
+];
+const FILTROS_DECISION=[
  {k:"enlamesa",t:"En la mesa"},
  {k:"priorizada",t:"Priorizadas"},
  {k:"descartada",t:"Descartadas"}
@@ -1506,6 +1512,9 @@ function vLectura(e,msg){
   /* 1. la calificación, lo primero */
   out+=`<div class="bloqueA">${veredictoHTML(e,true)}</div>`;
 
+  if(e.modoIA===false)
+    out+=`<div class="avisos"><div>Evalué esto en modo básico, sin IA (no pude conectar con el modelo). Es más estricto que el modo con IA — si la calificación te parece muy baja, puede ser por eso, no porque tu iniciativa esté mal.</div></div>`;
+
   if((e.avisos||[]).length)
     out+=`<div class="avisos">${e.avisos.map(a=>`<div>${esc(a)}</div>`).join("")}</div>`;
 
@@ -1522,7 +1531,8 @@ function vLectura(e,msg){
   /* 3. los seis criterios */
   out+=`<section class="tarjeta">
     <div class="th"><h3>Cómo quedó cada criterio</h3></div>
-    <p class="sub">Cada juicio va con la frase tuya en la que me apoyé. Si no encuentro una frase, el criterio no puede quedar sustentado.</p>
+    <p class="sub">Cada juicio va con la frase tuya en la que me apoyé. Si no encuentro una frase, el criterio no puede quedar sustentado.
+    <b>Opcional:</b> dile al agente si estás de acuerdo con cada juicio — no es necesario para avanzar al siguiente paso.</p>
     <div class="crits">${e.criterios.map(critHTML).join("")}</div>
   </section>`;
 
@@ -1768,10 +1778,11 @@ function matrizHTML(){
   return `<section class="matriz">
     <div class="th">
       <h2 class="subt">Dónde cae cada iniciativa</h2>
-      <span class="hint">Toca una burbuja para leerla</span>
+      <span class="hint">Toca una burbuja para leerla ·
+        <button class="btn link mini" onclick="S.verLey=!S.verLey;render()" style="padding:0">${S.verLey?"ocultar la guía":"ver qué significa cada eje"}</button></span>
     </div>
-    <div class="mgrid">
-      <div class="minstr">
+    <div class="mgrid${S.verLey?"":" singuia"}">
+      ${S.verLey?`<div class="minstr">
         <div class="ins"><div class="ic ejes"><span></span><span></span></div>
           <div><b>Los dos ejes</b><p>Horizontal, el esfuerzo. Vertical, el valor que promete. Arriba a la izquierda es lo que más conviene.</p></div></div>
         <div class="ins"><div class="ic tam"><i class="g"></i><i class="p"></i></div>
@@ -1780,7 +1791,7 @@ function matrizHTML(){
           <div><b>El color</b><p>Es la calificación: ${NIVELES.map(n=>`<span style="color:${n.c}">${n.t.toLowerCase()}</span>`).join(", ")}.</p></div></div>
         <div class="ins"><div class="ic pun"></div>
           <div><b>Borde punteado</b><p>Posición estimada por el agente. Declara alcance e impacto para ubicarla con precisión.</p></div></div>
-      </div>
+      </div>`:""}
       <div class="mwrap">
         <svg viewBox="0 0 ${W} ${H}" class="grafo" role="img" aria-label="Matriz de valor contra esfuerzo">
           <defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1">
@@ -1973,15 +1984,25 @@ function vExp(){
   ${leyendaHTML()}
   ${matrizHTML()}
   ${podioHTML()}
-  <div class="filtros">
-    ${FILTROS.map(f=>{
+  ${(()=>{
+    const chip=f=>{
       const n=f.k==="todas"?S.expedientes.length:S.expedientes.filter(e=>estadoDe(e).clave===f.k).length;
       const st=f.k==="todas"?null:(S.expedientes.map(estadoDe).find(x=>x.clave===f.k)||null);
       const col=st?st.c:"var(--tinta)", bg=st?st.bg:"var(--lilaSuave)";
       return `<button class="fx ${S.filtro===f.k?"on":""}" onclick="S.filtro='${f.k}';render()"
         style="${S.filtro===f.k?`color:${col};background:${bg};border-color:${col}40`:""}">
-        <i style="background:${st?st.c:"var(--lila)"}"></i>${f.t}<b>${n}</b></button>`;}).join("")}
-  </div>
+        <i style="background:${st?st.c:"var(--lila)"}"></i>${f.t}<b>${n}</b></button>`;
+    };
+    return `<div class="filtros">${FILTROS.map(chip).join("")}</div>
+    <div class="filtros-grupo">
+      <span class="fg-label">Por calidad del documento (mientras sigue en Borrador)</span>
+      <div class="filtros">${FILTROS_CALIDAD.map(chip).join("")}</div>
+    </div>
+    <div class="filtros-grupo">
+      <span class="fg-label">Por decisión de la mesa</span>
+      <div class="filtros">${FILTROS_DECISION.map(chip).join("")}</div>
+    </div>`;
+  })()}
   <div style="display:flex;gap:12px;margin:16px 0 20px;flex-wrap:wrap;align-items:center">
     <label style="font-size:13px;color:var(--muted);font-weight:600">Ordenar por
       <select onchange="S.orden=this.value;render()" style="margin-left:8px;border:1px solid var(--line);border-radius:99px;padding:8px 14px;font-family:var(--sans);font-size:13px">
@@ -2219,7 +2240,11 @@ function vIniciativas(){
     <h1 class="tituloV" style="font-size:24px;letter-spacing:-.02em">Iniciativas por squad</h1>
     </div>
   <p style="font-size:14px;color:var(--muted);max-width:66ch;margin:10px 0 0">
-    Aquí va lo que cada squad tiene en marcha. Es lo único que me permite avisarte que tu iniciativa
+    Esta pantalla tiene dos partes: primero, el registro que ustedes cargan a mano con lo que cada squad
+    tiene en marcha (sirve para que detecte cruces entre iniciativas); después, la lista de las iniciativas
+    que ya pasaron por el agente, solo para consultarlas.</p>
+  <h2 class="subt" style="margin-top:24px">El registro que cargas a mano</h2>
+  <p class="sub" style="margin-bottom:14px">Lo que cada squad tiene en marcha. Es lo único que me permite avisarte que tu iniciativa
     se solapa con algo que ya está haciendo otro equipo, o que depende de ello. Si está vacío evalúo igual,
     pero sobre esa parte no te puedo decir nada.</p>
   <div style="display:flex;gap:12px;margin:18px 0;flex-wrap:wrap;align-items:center">
@@ -2228,9 +2253,6 @@ function vIniciativas(){
       <input type="file" accept=".xlsx,.xls,.csv,.json" style="display:none" onchange="importarCorpus(this.files[0])"></label>
     ${n?`<button class="btn link" onclick="exportarCorpus()">Exportar</button>`:""}
   </div>
-  ${evaluadasHTML()}
-  <h2 class="subt">El registro que cargas a mano</h2>
-  <p class="sub" style="margin-bottom:14px">Lo que otros squads tienen en marcha y todavía no ha pasado por aquí. Sirve para detectar cruces.</p>
   ${n?`<div class="tabla">
     <div class="fila cab"><span>Squad</span><span>Iniciativa</span><span>Objetivo de negocio</span><span>Estado</span><span></span></div>
     ${S.corpus.map((i,x)=>`<div class="fila">
@@ -2249,7 +2271,8 @@ function vIniciativas(){
   </div>`}
   <p style="font-size:12.5px;color:var(--faint);margin-top:20px;max-width:64ch">
     ${Fire.ok?"Esta lista es compartida: la ve cualquiera que entre a la herramienta."
-             :"No estoy logrando conectar con la base de datos ahora mismo. Exporta la lista para no perderla."}</p>`;
+             :"No estoy logrando conectar con la base de datos ahora mismo. Exporta la lista para no perderla."}</p>
+  <div style="margin-top:32px;border-top:1px solid var(--line);padding-top:24px">${evaluadasHTML()}</div>`;
 }
 
 /* ---------- Acta: versión completa y exportable ---------- */
@@ -2414,7 +2437,7 @@ async function empezar(){
   S.expedientes.unshift(S.exp);guardarExp(S.exp);Fire.logEvento(S.exp.autor,"evaluar",S.exp.id);
   set({vista:"chat",fase:"leyendo",aviso:""});
 
-  let r=null;
+  let r=null,modoIA=false;
   try{
     const m=await evaluarConModelo(t);
     const loc=evaluarLocal(t,S.expedientes);
@@ -2422,13 +2445,14 @@ async function empezar(){
        criterios:m.criterios||loc.criterios,dependencias:m.dependencias||loc.dependencias,
        cobertura:m.cobertura||loc.cobertura,
        preguntas:(m.preguntas||[]).map(p=>({...p,respuesta:"",nolose:false}))};
+    modoIA=true;
   }catch(err){}
   if(!r){const loc=evaluarLocal(t,S.expedientes);r={...loc,preguntas:preguntasDe(loc.criterios)};}
   if(!r.preguntas||!r.preguntas.length)r.preguntas=preguntasDe(r.criterios);
 
   await new Promise(res=>setTimeout(res,1400));
   const sem=semaforoDe(r.criterios,r.noEvaluable);
-  Object.assign(S.exp,r,{semaforo:sem,lectura:lecturaDe(r.criterios,sem)});
+  Object.assign(S.exp,r,{semaforo:sem,lectura:lecturaDe(r.criterios,sem),modoIA});
   S.exp.puntaje=puntajeDe(r.criterios,r.admisibilidad);
   S.exp.prioridad=prioridadDe(t,r.criterios);
   if(ver>1)S.exp.avisos=[...(S.exp.avisos||[]),"Ya tenías “"+meta.iniciativa+"” evaluada. Esta queda como versión "+ver+" y vas a poder comparar las dos."];
