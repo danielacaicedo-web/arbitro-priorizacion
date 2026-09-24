@@ -9,8 +9,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
 <style>
 :root{
   padding-top:env(safe-area-inset-top,0px);
@@ -1205,30 +1203,13 @@ ${txt}`}]})});
 
 /* ============================================================ ESTADO */
 const LLAVE="arbitro.spin.datos.v1";
-const firebaseConfig = {
-  apiKey: "AIzaSyC7z-S3GHa4CeKbOAdjuN3hfyFY_VEfjnY",
-  authDomain: "arbitro-priorizacion.firebaseapp.com",
-  projectId: "arbitro-priorizacion",
-  storageBucket: "arbitro-priorizacion.firebasestorage.app",
-  messagingSenderId: "131041210503",
-  appId: "1:131041210503:web:88b7a765d3107e5c428822"
-};
-
-let db = null;
-try {
-  firebase.initializeApp(firebaseConfig);
-  db = firebase.firestore();
-} catch(e) {
-  console.log('Firebase ya inicializado');
-}
-
 const Disco={ok:true,
-  async leer(){try{if(!db)return null;const doc=await db.collection('datos').doc('principal').get();return doc.exists?doc.data():null;}catch(e){Disco.ok=false;return null;}},
-  async escribir(d){try{if(!db)return false;await db.collection('datos').doc('principal').set(d);return true;}catch(e){Disco.ok=false;return false;}},
-  async borrar(){try{if(!db)return;await db.collection('datos').doc('principal').delete();}catch(e){}}
+const LLAVE="arbitro.spin.datos.v1";
+const Disco={ok:true,
+  leer(){try{const r=localStorage.getItem(LLAVE);return r?JSON.parse(r):null;}catch(e){Disco.ok=false;return null;}},
+  escribir(d){try{localStorage.setItem(LLAVE,JSON.stringify(d));return true;}catch(e){Disco.ok=false;return false;}},
+  borrar(){try{localStorage.removeItem(LLAVE);}catch(e){}}
 };
-};
-let S={verLista:false,verLey:false,sq:"",podio:null,arrastrando:null,busca:"",vsq:"todas",viendo:null,docHtml:"",vista:"inicio",doc:"",exp:null,key:"",expedientes:[],corpus:[],corpusEjemplo:false,orden:"fecha",filtro:"todas",
        meta:{iniciativa:"",squad:"",autor:""},aviso:"",fase:"",comparando:null,editando:null};
 function corpusActual(){return S.corpus||[];}
 function persistir(){
