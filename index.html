@@ -1,0 +1,2569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Árbitro de priorización — Spin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  box-sizing:border-box;
+  /* Núcleo de marca Spin */
+  --morado:#5601D9; --naranja:#FC630E;
+  --moradoOsc:#210B50; --cafe:#542200; --grisOsc:#2D2F3A;
+  --lila:#C7A1FF; --naranjaClaro:#FFA366;
+  --lilaSuave:#EEE3FF; --duraznoSuave:#FFF0E5; --peri:#D9DBFD;
+
+  /* Roles */
+  --paper:#F6F4FB; --surface:#FFFFFF; --ink:#2D2F3A; --tinta:#210B50;
+  --muted:#6B6C7A; --faint:#9B9CA9; --line:#E9E4F5;
+  --accent:var(--morado); --accentSoft:var(--lilaSuave);
+  --verde:#5601D9; --verdeSoft:#EEE3FF;      /* sustentado  */
+  --ambar:#C24A00; --ambarSoft:#FFF0E5;      /* falta info  */
+  --rojo:#2D2F3A;  --rojoSoft:#D9DBFD;       /* no evaluable*/
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --display:'Rethink Sans','Inter',system-ui,sans-serif;
+  --serif:Georgia,'Times New Roman',serif;
+  --r:20px; --rs:14px;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font-family:inherit}
+*:focus-visible{outline:2px solid var(--morado);outline-offset:3px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+h1,h2,h3,.display{font-family:var(--display);letter-spacing:-.025em;color:var(--tinta)}
+
+/* Encabezado */
+header{background:rgba(255,255,255,.88);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);
+  padding:calc(12px + env(safe-area-inset-top,0px)) 26px 12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:30}
+.marca{display:flex;align-items:center;gap:11px}
+.marca .sep{width:1px;height:20px;background:var(--line)}
+.marca .prod{font-family:var(--display);font-weight:600;font-size:14.5px;color:var(--tinta);letter-spacing:-.02em}
+.demo{font-size:11px;color:var(--naranja);background:var(--duraznoSuave);padding:4px 11px;border-radius:99px;font-weight:600;
+  border:1px solid #FFD9BF}
+nav{margin-left:auto;display:flex;gap:4px;background:var(--paper);padding:4px;border-radius:99px}
+nav button{background:none;border:none;color:var(--muted);padding:8px 15px;border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;transition:all .18s}
+nav button:hover:not(:disabled){color:var(--tinta)}
+nav button.on{background:var(--surface);color:var(--morado);box-shadow:0 1px 3px rgba(33,11,80,.1)}
+nav button:disabled{opacity:.3;cursor:not-allowed}
+
+main{max-width:1180px;margin:0 auto;padding:30px 26px 80px}
+
+/* Botones */
+.btn{background:var(--morado);color:#fff;border:1px solid var(--morado);padding:12px 22px;border-radius:99px;
+  font-size:14px;font-weight:600;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 2px 10px rgba(86,1,217,.22)}
+.btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 18px rgba(86,1,217,.28)}
+.btn.sec{background:var(--lilaSuave);color:var(--morado);border-color:transparent;box-shadow:none}
+.btn.sec:hover:not(:disabled){background:var(--peri)}
+.btn.link{background:none;border:none;color:var(--morado);padding:0;font-size:13.5px;font-weight:600;box-shadow:none}
+.btn.link:hover{text-decoration:underline;transform:none;box-shadow:none}
+.btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px}
+.chip{font-size:11.5px;font-weight:600;padding:3px 11px;border-radius:99px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.s-sustentado,.s-declarado{color:var(--morado);background:var(--lilaSuave)}
+.s-debil,.s-insinuado{color:var(--ambar);background:var(--duraznoSuave)}
+.s-ausente{color:#fff;background:var(--grisOsc)}
+.s-ausente::before{background:var(--naranjaClaro)}
+.ej{font-size:10.5px;color:var(--morado);background:var(--lilaSuave);padding:2px 9px;border-radius:99px;font-weight:600}
+
+/* Inicio */
+.hero{display:grid;grid-template-columns:1.5fr .68fr;gap:36px;align-items:center;
+  background:linear-gradient(120deg,#F3ECFF 0%,#EEE3FF 45%,#FFF0E5 100%);
+  border-radius:28px;padding:40px 42px 38px;margin-bottom:26px}
+@media(max-width:820px){.hero{grid-template-columns:1fr}.heroArt{display:none}}
+.hero h1{font-size:40px;line-height:1.12;margin:10px 0 16px;max-width:22ch;text-wrap:balance}
+.hero p{color:#4A4B58;max-width:58ch;font-size:15.5px;line-height:1.65;margin:0}
+.kicker{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--morado);
+  background:rgba(255,255,255,.7);padding:6px 14px;border-radius:99px}
+.kicker b{color:var(--naranja)}
+.heroArt{display:flex;justify-content:center}
+
+.pasos{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin:0 0 22px}
+.paso{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;position:relative;overflow:hidden}
+.paso::after{content:"";position:absolute;right:-26px;top:-26px;width:70px;height:70px;border-radius:50%;background:var(--lilaSuave);opacity:.55}
+.paso i{font-style:normal;color:var(--naranja);font-size:12px;font-weight:700;position:relative}
+.paso b{display:block;font-family:var(--display);font-size:15px;margin:4px 0 4px;position:relative;color:var(--tinta)}
+.paso span{font-size:13.5px;color:var(--muted);position:relative}
+
+textarea{width:100%;border:1px solid var(--line);border-radius:var(--rs);padding:14px;font-size:14.5px;line-height:1.6;
+  font-family:var(--sans);resize:vertical;color:var(--ink);background:#FCFBFE;transition:border-color .15s}
+textarea:focus{border-color:var(--lila);background:var(--surface)}
+.drop{border:1.5px dashed var(--lila);border-radius:var(--rs);padding:18px;text-align:center;color:var(--muted);
+  font-size:13.5px;margin-top:14px;background:var(--lilaSuave);transition:all .18s}
+.drop.over{border-color:var(--morado);background:var(--peri)}
+details summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:600}
+input[type=password],input[type=text]{border:1px solid var(--line);border-radius:99px;padding:11px 16px;font-size:13.5px;font-family:var(--sans);width:100%}
+
+/* Chat */
+.split{display:grid;grid-template-columns:1.5fr 1fr;gap:22px;align-items:start}
+@media(max-width:860px){.split{grid-template-columns:1fr}}
+.doc{position:sticky;top:84px;max-height:78vh;overflow:auto}
+.doc pre{white-space:pre-wrap;font-family:var(--serif);font-size:13.5px;line-height:1.7;margin:0;color:#3A3B47}
+.thread{display:flex;flex-direction:column;gap:16px}
+.msg{display:flex;gap:12px;align-items:flex-start;animation:rise .4s cubic-bezier(.2,.7,.3,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.av{width:32px;height:32px;border-radius:50%;flex:0 0 32px;margin-top:2px;
+  background:linear-gradient(135deg,var(--morado),#8B3BFF 60%,var(--naranja));display:flex;align-items:center;justify-content:center}
+.av svg{width:17px;height:17px}
+.burb{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);border-top-left-radius:6px;
+  padding:18px 20px;flex:1;box-shadow:0 1px 2px rgba(33,11,80,.04)}
+.burb h3{margin:0 0 9px;font-size:16.5px}
+.burb p{margin:0 0 9px}.burb p:last-child{margin-bottom:0}
+.typing span{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--lila);margin-right:5px;animation:bl 1.3s infinite}
+.typing span:nth-child(2){animation-delay:.18s;background:var(--naranjaClaro)}
+.typing span:nth-child(3){animation-delay:.36s}
+@keyframes bl{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+
+/* Semáforo */
+.sem{border-radius:var(--rs);padding:20px 22px;display:flex;gap:18px;align-items:center}
+.luz{width:52px;height:52px;border-radius:50%;flex:0 0 52px;display:flex;align-items:center;justify-content:center}
+.luz svg{width:26px;height:26px}
+.sem b{font-family:var(--display);font-size:21px;display:block;letter-spacing:-.02em}
+.sem small{color:var(--muted);display:block;font-size:12.5px;margin-top:7px}
+
+/* Criterios */
+.crit{border-top:1px solid var(--paper);padding:15px 0}
+.crit:first-child{border-top:none}
+.crit .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.crit .top strong{font-family:var(--display);font-size:15px;color:var(--tinta)}
+.barra{height:6px;border-radius:99px;background:var(--paper);margin:9px 0 10px;overflow:hidden}
+.barra i{display:block;height:100%;border-radius:99px;transition:width .7s cubic-bezier(.3,.8,.3,1)}
+.cita{font-family:var(--serif);font-size:13.5px;border-left:3px solid var(--lila);padding:2px 0 2px 12px;margin:6px 0 7px;color:#3A3B47}
+.nota{font-size:13.5px;color:var(--muted)}
+.voto{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
+.voto button{background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:7px 15px;font-size:12.5px;
+  font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s}
+.voto button:hover{border-color:var(--lila);color:var(--morado)}
+.marca2{font-size:12.5px;padding:9px 13px;border-radius:var(--rs);margin-top:10px}
+.marca2.ok{background:var(--lilaSuave);color:var(--morado)}
+.marca2.no{background:var(--duraznoSuave);color:var(--ambar)}
+
+/* Preguntas */
+.preg{border-top:1px solid var(--paper);padding:16px 0}
+.preg:first-of-type{border-top:none}
+.preg .q{font-size:15px;margin-bottom:9px;color:var(--tinta)}
+.preg .src{font-size:11px;color:var(--faint);font-weight:600}
+.preg textarea{font-size:13.5px}
+.progreso{font-size:13px;color:var(--muted);font-weight:600}
+.barraP{height:7px;background:var(--paper);border-radius:99px;overflow:hidden;margin:8px 0 16px}
+.barraP i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--morado),var(--naranja));transition:width .5s ease}
+
+/* Acta */
+.acta{border:1px solid var(--line);border-radius:var(--r);padding:26px;background:var(--surface);
+  box-shadow:0 8px 30px rgba(33,11,80,.07)}
+.acta h2{font-size:23px;margin:0 0 3px}
+.acta h3{font-family:var(--display);font-size:16px;margin:0 0 7px;color:var(--tinta)}
+.bloque{margin-bottom:20px}
+.bloque .n{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--lilaSuave);color:var(--morado);
+  font-size:11px;font-weight:700;align-items:center;justify-content:center;margin-right:9px;font-family:var(--sans)}
+.acta ul{margin:0;padding-left:18px}
+
+/* Expedientes */
+.exp{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;gap:16px;margin-bottom:12px;transition:box-shadow .18s}
+.exp:hover{box-shadow:0 4px 18px rgba(33,11,80,.07)}
+.exp .lat{width:8px;border-radius:99px;flex:0 0 8px}
+.exp input.nom{border:1px solid transparent;background:none;font-family:var(--display);font-size:15px;font-weight:600;
+  padding:4px 7px;border-radius:8px;width:min(640px,100%);color:var(--tinta)}
+.exp input.nom:hover{border-color:var(--line);background:var(--paper)}
+.acciones{display:flex;gap:16px;margin-top:11px;padding-left:7px;flex-wrap:wrap}
+.vs{background:var(--paper);border-radius:var(--rs);padding:16px;margin-top:13px}
+.vs .fila{display:flex;gap:10px;align-items:center;font-size:13.5px;margin-bottom:7px}
+.vs .fila.igual{opacity:.4}
+.aviso{background:var(--duraznoSuave);color:var(--cafe);padding:13px 18px;border-radius:var(--rs);font-size:13.5px;
+  margin-bottom:16px;border:1px solid #FFD9BF}
+
+.ejemplo{background:var(--duraznoSuave);border-radius:var(--rs);padding:14px 16px;margin-top:11px;font-family:var(--serif);font-size:13.5px;color:#4A3520;line-height:1.6}
+.ejemplo .et{font-family:var(--sans);font-size:10.5px;font-weight:700;color:var(--naranja);margin-bottom:7px}
+.ejemplo .pie{font-family:var(--sans);font-size:12px;color:var(--muted);margin-top:9px}
+.pregunta{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px}
+.pregunta label{display:block;font-family:var(--display);font-size:15px;font-weight:600;color:var(--tinta);margin-bottom:10px}
+.pregunta .fila{display:flex;gap:10px;flex-wrap:wrap}
+.pregunta input{flex:1;min-width:220px;border:1px solid var(--line);border-radius:99px;padding:12px 18px;font-size:14px;font-family:var(--sans)}
+.pregunta input:focus{border-color:var(--lila);outline:none}
+.pregunta .sug{display:flex;gap:16px;margin-top:12px;flex-wrap:wrap}
+.msg.yo{flex-direction:row-reverse}
+.msg.yo .burb{background:var(--lilaSuave);border-color:transparent;border-radius:var(--r);border-top-right-radius:6px;flex:0 1 auto;max-width:78%;color:var(--tinta)}
+.ciclo{display:flex;gap:6px;margin-top:10px;padding-left:7px;flex-wrap:wrap;align-items:center}
+.ciclo button{background:var(--paper);border:1px solid transparent;border-radius:99px;padding:5px 13px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
+.ciclo button.on{background:var(--lilaSuave);color:var(--morado)}
+.ciclo input{border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-size:12.5px;min-width:260px;flex:1;font-family:var(--sans)}
+.decision{background:var(--lilaSuave);border-radius:var(--rs);padding:11px 14px;margin-top:10px;font-size:13px;color:var(--tinta)}
+
+
+.tabla{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.tabla .fila{display:grid;grid-template-columns:1.1fr 1.6fr 1.6fr .9fr auto;gap:10px;padding:10px 14px;align-items:center;border-top:1px solid var(--paper)}
+.tabla .fila.cab{background:var(--lilaSuave);font-size:11.5px;font-weight:700;color:var(--morado);border:none;padding:11px 14px}
+.tabla .fila input{border:1px solid transparent;background:transparent;border-radius:8px;padding:7px 9px;font-size:13.5px;font-family:var(--sans);width:100%;color:var(--ink)}
+.tabla .fila input:hover{border-color:var(--line)}
+.tabla .fila input:focus{border-color:var(--lila);background:var(--paper);outline:none}
+@media(max-width:760px){.tabla .fila{grid-template-columns:1fr 1fr}.tabla .fila.cab{display:none}}
+.vacio{background:var(--surface);border:1.5px dashed var(--lila);border-radius:var(--r);padding:38px 30px;text-align:center;max-width:64ch;margin:0 auto}
+.vacio h3{font-size:19px;margin:0 0 10px}
+.vacio p{color:var(--muted);font-size:14px;margin:0 auto 8px;max-width:52ch}
+.meta3{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.meta3 label{font-size:12px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;gap:5px}
+.meta3 input{border:1px solid var(--line);border-radius:99px;padding:10px 15px;font-size:13.5px;font-family:var(--sans);color:var(--ink)}
+.meta3 input:focus{border-color:var(--lila);outline:none}
+.metaActa{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0 20px;padding:14px 0;border-top:1px solid var(--paper);border-bottom:1px solid var(--paper)}
+.metaActa div{font-size:13.5px;color:var(--tinta);font-weight:600}
+.metaActa span{display:block;font-size:10.5px;font-weight:700;color:var(--faint);margin-bottom:3px}
+.mini{display:flex;flex-wrap:wrap;gap:6px}
+.mini .chip{font-size:10.5px}
+#areaImpresion{display:none}
+@media print{
+  body{background:#fff}
+  header,footer,nav,main{display:none!important}
+  #areaImpresion{display:block;padding:0;font-family:Georgia,serif;font-size:11.5pt;line-height:1.5;color:#000}
+  #areaImpresion h1{font-size:20pt}#areaImpresion h2{font-size:13pt;margin-top:18pt}#areaImpresion h3{font-size:11.5pt;margin-bottom:2pt}
+}
+
+
+.paso svg{display:block;margin-bottom:10px;position:relative}
+.paso::after{display:none}
+.vacio svg{display:block;margin:0 auto 14px}
+.av{background:none!important}
+.av svg{width:34px;height:34px}
+.heroArt svg{max-width:100%;height:auto}
+
+
+/* Acentos de color en piezas pequeñas. El blanco sigue mandando. */
+.burb > h3{display:flex;align-items:center;gap:10px}
+.burb > h3::before{content:"";width:5px;height:19px;border-radius:99px;flex:0 0 5px;
+  background:linear-gradient(180deg,var(--morado),var(--naranja))}
+.bloque .n{background:linear-gradient(135deg,var(--morado),var(--naranja));color:#fff}
+.acta h2{display:flex;align-items:center;gap:11px}
+.acta h2::before{content:"";width:6px;height:24px;border-radius:99px;
+  background:linear-gradient(180deg,var(--morado),var(--naranja))}
+.tituloV{display:flex;align-items:center;gap:11px;margin:0}
+.tituloV::before{content:"";width:6px;height:26px;border-radius:99px;
+  background:linear-gradient(180deg,var(--morado),var(--naranja))}
+.paso{background:linear-gradient(180deg,#FCFAFF,#FFFFFF 42%)}
+.paso::before{content:"";position:absolute;left:0;top:0;height:4px;width:58px;
+  border-radius:0 99px 99px 0;background:linear-gradient(90deg,var(--morado),var(--naranja))}
+.kicker{background:linear-gradient(120deg,rgba(255,255,255,.92),rgba(255,255,255,.62));
+  box-shadow:inset 0 0 0 1px rgba(86,1,217,.12)}
+.chip::before{background:currentColor;opacity:.85}
+.s-sustentado{background:linear-gradient(120deg,#EFE6FF,#E6DBFF)}
+.s-debil{background:linear-gradient(120deg,#FFF3E6,#FFE9D5)}
+.exp .lat{background:linear-gradient(180deg,var(--c1,var(--morado)),var(--c2,var(--naranja)))}
+.tabla .fila.cab{background:linear-gradient(90deg,#EFE6FF,#F7F0FF 55%,#FFF3E9)}
+.vs{background:linear-gradient(180deg,#FAF8FF,#F5F3FA)}
+.ciclo button.on{background:linear-gradient(120deg,#EFE6FF,#E8DEFF)}
+.pregunta{background:linear-gradient(180deg,#FFFFFF,#FCFAFF)}
+.pregunta label{display:flex;align-items:center;gap:10px}
+.pregunta .sub{font-size:13.5px;color:var(--muted);margin:8px 0 12px;max-width:58ch}
+.pregunta label::before{content:"";width:5px;height:18px;border-radius:99px;flex:0 0 5px;
+  background:linear-gradient(180deg,var(--naranja),var(--morado))}
+.metaActa span{background:linear-gradient(90deg,var(--morado),var(--naranja));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.luz{background-image:radial-gradient(circle at 32% 26%,rgba(255,255,255,.42),rgba(255,255,255,0) 62%)}
+header{background-image:linear-gradient(90deg,rgba(86,1,217,.05),rgba(252,99,14,.04) 70%,transparent)}
+nav button.on{background:linear-gradient(135deg,#FFFFFF,#F7F2FF)}
+
+
+/* Los tres momentos */
+.migas{display:flex;align-items:center;gap:18px;margin:0 0 18px;flex-wrap:wrap}
+.migas .ruta{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--faint);font-weight:600}
+.migas .ruta span{padding:5px 13px;border-radius:99px;background:var(--surface);border:1px solid var(--line)}
+.migas .ruta span.on{color:var(--morado);border-color:transparent;background:linear-gradient(120deg,#EFE6FF,#E8DEFF)}
+.siguiente{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 22px;
+  display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;
+  background-image:linear-gradient(120deg,#FCFAFF,#FFFFFF 55%,#FFF8F2)}
+.siguiente b{display:block;font-family:var(--display);font-size:16px;color:var(--tinta)}
+.siguiente span{display:block;font-size:13.5px;color:var(--muted);margin-top:3px;max-width:52ch}
+.focoQ{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:26px 28px}
+.cabQ{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;
+  font-size:12.5px;font-weight:600;color:var(--muted)}
+.puntos{display:flex;gap:6px}
+.pt{width:10px;height:10px;border-radius:50%;border:none;padding:0;cursor:pointer;background:var(--line)}
+.pt.ok{background:linear-gradient(135deg,var(--morado),var(--naranja))}
+.pt.on{box-shadow:0 0 0 3px var(--lilaSuave)}
+.qtxt{font-size:21px;line-height:1.3;margin:6px 0 6px}
+.focoQ .src{font-size:12px;color:var(--faint);margin-bottom:14px}
+.focoQ textarea{font-size:15px}
+.accQ{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
+.accQ .nav{display:flex;gap:10px;margin-left:auto}
+.split.informe{grid-template-columns:1.95fr 1fr}
+
+
+.nivel{margin-top:14px}
+.nivel .nt{font-family:var(--display);font-size:13.5px;font-weight:700;color:var(--tinta);display:flex;align-items:center;gap:8px}
+.nivel .nt::before{content:"";width:4px;height:15px;border-radius:99px;background:linear-gradient(180deg,var(--morado),var(--naranja))}
+.nivel.mejora .nt::before{background:var(--line)}
+.nivel.mejora .nt{color:var(--muted)}
+.nivel .nn{font-size:12.5px;color:var(--faint);margin-top:4px;padding-left:12px}
+
+
+.marcador{width:64px;height:64px;border-radius:50%;border:3px solid;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:0 0 64px;background:#fff}
+.marcador b{font-family:var(--display);font-size:22px;line-height:1}
+.marcador span{font-size:9.5px;color:var(--faint);margin-top:1px}
+.ficha{border:1px solid var(--line);border-radius:var(--rs);padding:16px 18px;background:linear-gradient(180deg,#FCFAFF,#fff)}
+.ficha .fh{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.ficha .fh b{font-family:var(--display);font-size:15.5px;display:block;color:var(--tinta)}
+.ficha .fh span{font-size:12.5px;color:var(--muted);display:block;margin-top:3px;max-width:48ch}
+.ficha .rice{font-family:var(--display);font-size:30px;font-weight:700;line-height:1;text-align:right}
+.ficha .rice i{display:block;font-style:normal;font-size:11.5px;font-weight:600;margin-top:3px}
+.campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:14px}
+.campos label{font-size:11.5px;font-weight:700;color:var(--muted);display:flex;flex-direction:column;gap:5px}
+.campos input,.campos select{border:1px solid var(--line);border-radius:10px;padding:8px 11px;font-size:13.5px;font-family:var(--sans);width:100%}
+.campos .cx{display:flex;align-items:center;gap:6px}
+.campos .cx span{font-size:11px;color:var(--faint);white-space:nowrap}
+.campos .fijo{border:1px dashed var(--lila);border-radius:10px;padding:8px 11px;font-size:13.5px;font-weight:700;background:var(--lilaSuave)}
+.campos em{font-style:normal;font-weight:500;font-size:10.5px;color:var(--faint);line-height:1.35}
+.faltaR{font-size:12.5px;color:var(--ambar);background:var(--duraznoSuave);padding:9px 12px;border-radius:10px;margin-top:12px}
+.cuad{margin-top:12px;padding-top:12px;border-top:1px solid var(--paper)}
+.cuad b{font-family:var(--display);font-size:14px;color:var(--tinta)}
+.cuad span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.leyenda{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;margin-top:18px}
+.leyenda .lz b{font-family:var(--display);font-size:16px;color:var(--tinta)}
+.leyenda .lz p{font-size:13.5px;color:var(--muted);margin:4px 0 0}
+.ejes{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px;margin-top:16px}
+.ejes>div>b{font-family:var(--display);font-size:13.5px;color:var(--morado)}
+.ejes p{font-size:12.5px;color:var(--muted);margin:5px 0 9px;line-height:1.5}
+.ejes .ad{color:var(--ambar)}
+.nv{font-size:12.5px;color:var(--muted);display:flex;align-items:baseline;gap:7px;margin-bottom:4px}
+.nv span{width:9px;height:9px;border-radius:50%;flex:0 0 9px;position:relative;top:1px}
+.nv b{color:var(--tinta)}
+.cuadros{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:16px}
+.q{border-radius:12px;padding:11px 13px;font-size:12px}
+.q b{display:block;font-family:var(--display);font-size:12.5px}
+.q span{color:var(--muted)}
+.q1{background:var(--lilaSuave)}.q1 b{color:var(--morado)}
+.q2{background:var(--duraznoSuave)}.q2 b{color:var(--ambar)}
+.q3{background:var(--peri)}.q3 b{color:var(--tinta)}
+.q4{background:var(--paper)}.q4 b{color:var(--muted)}
+.marcas{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px;padding-left:5px}
+.pill{font-size:11.5px;font-weight:700;padding:3px 11px;border-radius:99px}
+.pill.cu{color:var(--muted);background:var(--paper)}
+
+
+.filtros{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
+.fx{background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:8px 15px;font-size:12.5px;
+  font-weight:600;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s}
+.fx:hover{border-color:var(--lila)}
+.fx i{width:8px;height:8px;border-radius:50%;display:block}
+.fx b{font-size:11px;opacity:.7}
+.fx.on{font-weight:700}
+
+
+/* ====== Proceso en tres pasos ====== */
+.proceso{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:24px}
+.volver{background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;padding:6px 0}
+.volver:hover{color:var(--morado)}
+.pasos3{display:flex;align-items:center;gap:0;background:var(--surface);border:1px solid var(--line);
+  border-radius:99px;padding:6px;flex-wrap:wrap}
+.p3{display:flex;align-items:center;gap:10px;background:none;border:none;border-radius:99px;
+  padding:8px 16px 8px 9px;cursor:pointer;text-align:left;transition:all .18s}
+.p3:disabled{cursor:not-allowed;opacity:.45}
+.p3 i{width:26px;height:26px;border-radius:50%;background:var(--paper);color:var(--muted);font-style:normal;
+  font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 26px}
+.p3 b{display:block;font-family:var(--display);font-size:13.5px;color:var(--muted);letter-spacing:-.01em}
+.p3 span{display:block;font-size:11px;color:var(--faint);margin-top:1px}
+.p3.activo{background:linear-gradient(120deg,#EFE6FF,#F6F1FF)}
+.p3.activo i{background:linear-gradient(135deg,var(--morado),var(--naranja));color:#fff}
+.p3.activo b{color:var(--morado)}
+.p3.hecho i{background:#E6F4EC;color:#1E7A4B}
+.p3.hecho b{color:var(--tinta)}
+.ln{width:26px;height:2px;background:var(--line);border-radius:2px;flex:0 0 26px}
+.ln.on{background:linear-gradient(90deg,var(--morado),var(--naranja))}
+@media(max-width:700px){.pasos3{border-radius:20px}.p3 span{display:none}}
+
+/* ====== Flujo de la lectura ====== */
+.flujo{display:flex;flex-direction:column;gap:18px}
+.bloqueA .sem{padding:22px 24px}
+.tarjeta{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px 24px}
+.tarjeta .th{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.tarjeta h3{font-size:16.5px;margin:0;letter-spacing:-.02em}
+.tarjeta .sub{font-size:13.5px;color:var(--muted);margin:6px 0 0;line-height:1.6;max-width:62ch}
+.resumen{display:flex;gap:7px;flex-wrap:wrap}
+.mini-chip{font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:99px}
+.leyendita{font-size:12.5px;color:var(--muted);background:var(--paper);border-radius:10px;padding:10px 13px;
+  margin:12px 0 10px;line-height:1.7}
+.leyendita b{color:var(--tinta)}
+.cols{display:grid;grid-template-columns:1fr;gap:16px;margin-top:6px}
+.btn.mini{font-size:12.5px;padding:0}
+.btn.sec.mini{padding:8px 15px;font-size:12.5px;margin-top:12px}
+.crits{margin-top:6px}
+.cruce{border-top:1px solid var(--paper);padding:11px 0;font-size:13.5px;line-height:1.55}
+.cruce strong{text-transform:capitalize;color:var(--tinta)}
+.cruce .sq{color:var(--faint);font-size:12px}
+.cruce div{color:var(--muted)}
+.nada{font-size:13.5px;color:var(--muted);margin:10px 0 0}
+.limite{font-size:12.5px;color:var(--ambar);margin-top:12px;background:var(--duraznoSuave);padding:9px 12px;border-radius:10px}
+.lista{margin:10px 0 0;padding-left:20px;font-size:14.5px;line-height:2}
+.avisos{display:flex;flex-direction:column;gap:8px}
+.avisos div{background:var(--lilaSuave);color:var(--tinta);border-radius:12px;padding:12px 16px;font-size:13.5px;line-height:1.55}
+
+/* ====== Botón de avanzar ====== */
+.avanzar{display:flex;align-items:center;justify-content:space-between;gap:20px;width:100%;text-align:left;
+  background:linear-gradient(120deg,var(--morado),#7B2BEA 62%,var(--naranja));color:#fff;border:none;
+  border-radius:var(--r);padding:22px 26px;cursor:pointer;box-shadow:0 8px 26px rgba(86,1,217,.26);
+  transition:transform .16s,box-shadow .16s}
+.avanzar:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 14px 34px rgba(86,1,217,.32)}
+.avanzar span{display:block;font-size:11.5px;font-weight:700;opacity:.82;letter-spacing:.04em;text-transform:uppercase}
+.avanzar b{display:block;font-family:var(--display);font-size:20px;margin-top:4px;letter-spacing:-.02em}
+.avanzar em{display:block;font-style:normal;font-size:13px;opacity:.86;margin-top:5px;max-width:52ch;line-height:1.5}
+.avanzar i{font-style:normal;font-size:26px;width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.18);
+  display:flex;align-items:center;justify-content:center;flex:0 0 52px}
+.avanzar.off{background:var(--surface);color:var(--muted);box-shadow:none;border:1px dashed var(--line);cursor:not-allowed}
+.avanzar.off b{color:var(--tinta)}
+.avanzar.off i{background:var(--paper);color:var(--faint)}
+
+/* ====== Documento con su formato ====== */
+.docfmt{font-family:var(--serif);font-size:13.5px;line-height:1.7;color:#3A3B47}
+.docfmt h1,.docfmt h2,.docfmt h3{font-family:var(--display);color:var(--tinta);margin:16px 0 6px;line-height:1.3}
+.docfmt h1{font-size:16px}.docfmt h2{font-size:14.5px}.docfmt h3{font-size:13.5px}
+.docfmt p{margin:0 0 9px}
+.docfmt ul,.docfmt ol{margin:0 0 10px;padding-left:20px}
+.docfmt li{margin-bottom:3px}
+.docfmt table{border-collapse:collapse;width:100%;margin:10px 0;font-size:11.5px;font-family:var(--sans)}
+.docfmt td,.docfmt th{border:1px solid var(--line);padding:5px 7px;vertical-align:top;text-align:left}
+.docfmt th,.docfmt tr:first-child td{background:var(--lilaSuave);font-weight:700;color:var(--tinta)}
+.docfmt strong{color:var(--tinta)}
+
+
+.comofunciona{margin:0 0 24px}
+.cf-h{display:flex;align-items:baseline;gap:12px;margin-bottom:14px}
+.cf-h b{font-family:var(--display);font-size:17px;color:var(--tinta);display:flex;align-items:center;gap:10px}
+.cf-h b::before{content:"";width:5px;height:19px;border-radius:99px;background:linear-gradient(180deg,var(--morado),var(--naranja))}
+.cf-h span{font-size:13px;color:var(--muted)}
+.pasos{gap:16px}
+.paso{padding:20px}
+.paso span{line-height:1.6;display:block;margin-top:5px}
+
+
+.similar{display:flex;gap:14px;align-items:flex-start;border-radius:var(--r);padding:18px 22px;border:1px solid}
+.similar.no{background:#E9F5EE;border-color:#BFE3CE}
+.similar.nd{background:var(--paper);border-color:var(--line)}
+.similar.nd i{background:var(--faint)}
+.similar.si{background:var(--duraznoSuave);border-color:#FFD9BF}
+.similar i{width:30px;height:30px;border-radius:50%;flex:0 0 30px;display:flex;align-items:center;justify-content:center;
+  font-style:normal;font-weight:700;font-size:15px;color:#fff}
+.similar.no i{background:#1E7A4B}
+.similar.si i{background:var(--naranja)}
+.similar b{font-family:var(--display);font-size:15px;color:var(--tinta);display:block}
+.similar p{font-size:13.5px;color:#45464F;margin:6px 0 0;line-height:1.55}
+.similar .sq{color:var(--muted);font-size:12px}
+.similar em{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:8px}
+
+
+.evaluadas{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px 24px;margin-top:20px}
+.evaluadas .th{align-items:center}
+.subt{font-family:var(--display);font-size:16.5px;margin:0;color:var(--tinta);letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.subt::before{content:"";width:5px;height:18px;border-radius:99px;background:linear-gradient(180deg,var(--morado),var(--naranja))}
+h2.subt{margin-top:28px}
+.buscar{border:1px solid var(--line);border-radius:99px;padding:9px 16px;font-size:13px;font-family:var(--sans);min-width:260px}
+.buscar:focus{border-color:var(--lila);outline:none}
+.grupoSq{margin-top:14px}
+.sqh{font-size:11.5px;font-weight:700;color:var(--morado);text-transform:uppercase;letter-spacing:.05em;
+  display:flex;align-items:center;gap:8px;padding-bottom:6px;border-bottom:1px solid var(--paper)}
+.sqh b{background:var(--lilaSuave);border-radius:99px;padding:1px 8px;font-size:10.5px}
+.fi{display:flex;align-items:center;gap:12px;padding:10px 2px;border-bottom:1px solid var(--paper)}
+.fi .dot{width:9px;height:9px;border-radius:50%;flex:0 0 9px}
+.fin{flex:1;min-width:0}
+.fin b{font-size:14px;color:var(--tinta);display:block}
+.fin span{font-size:11.5px;color:var(--faint)}
+
+
+main{padding:34px 26px 90px}
+.split{gap:26px}
+.tarjeta{padding:24px 26px}
+.tarjeta h3{line-height:1.35}
+.tarjeta .sub,.leyendita{max-width:70ch}
+.burb{padding:20px 22px;line-height:1.62}
+.burb p,.burb li{max-width:66ch}
+.crit{padding:16px 0}
+.crit .nota{line-height:1.6;max-width:68ch}
+.cita{line-height:1.6;margin:8px 0 8px}
+.doc{padding:22px 24px}
+.docfmt{line-height:1.75}
+.acta{padding:30px 32px}
+.acta .bloque{margin-bottom:22px}
+.bloque div,.acta li{line-height:1.65}
+.focoQ{padding:30px 32px}
+.qtxt{line-height:1.35;max-width:32ch;font-size:22px}
+.avanzar{padding:24px 28px}
+.exp{padding:20px 22px}
+.leyenda{padding:24px 26px}
+.ejes p{max-width:60ch}
+.vacio p{line-height:1.65}
+.similar{padding:20px 24px}
+.similar p{max-width:64ch}
+.evaluadas{padding:24px 26px}
+.pregunta{padding:22px 24px}
+.pregunta .sub{max-width:62ch}
+@media(min-width:1100px){.split{grid-template-columns:1.62fr 1fr}.split.informe{grid-template-columns:2fr 1fr}}
+
+
+.filtros.chico .fx{padding:6px 13px;font-size:12px}
+.soloL{font-size:12px;color:var(--muted);background:var(--paper);padding:6px 14px;border-radius:99px}
+.fi{cursor:pointer;border-radius:10px;padding-left:8px;padding-right:8px;transition:background .14s}
+.fi:hover{background:var(--paper)}
+.fi .ver{font-size:12px;font-weight:700;color:var(--morado);opacity:0;transition:opacity .14s;white-space:nowrap}
+.fi:hover .ver{opacity:1}
+.qa{border-top:1px solid var(--paper);padding:13px 0}
+.qa b{font-size:14px;color:var(--tinta);display:block;line-height:1.5}
+.qa p{font-size:13.5px;color:var(--muted);margin:5px 0 0;line-height:1.6;max-width:66ch}
+
+
+/* ====== Matriz ====== */
+.matriz{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:24px 26px;margin-top:18px}
+.matriz .th{align-items:center;margin-bottom:12px}
+.hint{font-size:12.5px;color:var(--muted)}
+.mwrap{overflow-x:auto}
+.grafo{width:100%;min-width:620px;height:auto;display:block}
+.grafo .eje{stroke:#DCD6EC;stroke-width:1.5;stroke-dasharray:5 5}
+.grafo .qt{font-family:var(--display);font-size:12.5px;font-weight:700;fill:#9B93B5}
+.grafo .qd{font-size:10.5px;fill:#B3ACC6}
+.grafo .ax{font-size:10.5px;fill:var(--faint)}
+.grafo .axt{font-size:11.5px;font-weight:700;fill:var(--muted)}
+.grafo .bcod{font-size:12.5px;font-weight:800;fill:#fff;pointer-events:none;letter-spacing:.02em}
+.burbuja{cursor:pointer}
+.burbuja circle{transition:transform .16s,fill-opacity .16s;transform-origin:center;transform-box:fill-box}
+.burbuja:hover circle{fill-opacity:1;transform:scale(1.08)}
+.mleyenda{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:16px;margin-top:16px;
+  border-top:1px solid var(--paper);padding-top:16px}
+.mleyenda b{font-family:var(--display);font-size:13px;color:var(--tinta);display:block;margin-bottom:3px}
+.mleyenda span{font-size:12.5px;color:var(--muted);line-height:1.55}
+.mleyenda i{display:inline-block;width:9px;height:9px;border-radius:50%;margin:0 4px 0 9px;position:relative;top:1px}
+.sinubicar{background:var(--paper);border-radius:var(--rs);padding:14px 16px;margin-top:16px}
+.sinubicar b{font-size:13px;color:var(--tinta);display:block}
+.sinubicar span{font-size:12.5px;color:var(--muted);display:block;margin-top:3px;line-height:1.5}
+.sinubicar .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.sinubicar .pill{border:none;cursor:pointer;font-family:var(--sans)}
+
+/* ====== Podio ====== */
+.podio{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:24px 26px;margin-top:18px}
+.lista-podio{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.pp{display:flex;align-items:center;gap:13px;background:var(--paper);border:1px solid transparent;border-radius:14px;
+  padding:12px 15px;cursor:grab;transition:all .14s}
+.pp:hover{border-color:var(--lila);background:#FBF9FF}
+.pp.sobre{border-color:var(--morado);background:var(--lilaSuave);transform:translateY(-1px)}
+.puesto{width:30px;height:30px;border-radius:50%;background:var(--surface);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:13.5px;
+  color:var(--muted);flex:0 0 30px}
+.puesto.top1{background:linear-gradient(135deg,#F5C24B,#E0982A);color:#fff;border-color:transparent}
+.puesto.top2{background:linear-gradient(135deg,#D3D7DE,#AEB4BF);color:#fff;border-color:transparent}
+.puesto.top3{background:linear-gradient(135deg,#E0A579,#C07C4A);color:#fff;border-color:transparent}
+.pp .dot{width:9px;height:9px;border-radius:50%;flex:0 0 9px}
+.ppn{flex:1;min-width:0}
+.ppn b{font-size:14px;color:var(--tinta);display:block}
+.ppn span{font-size:11.5px;color:var(--faint)}
+.agarre{color:var(--faint);font-size:14px;letter-spacing:-2px;cursor:grab}
+
+/* ====== Filtro por squad ====== */
+.fila-filtros{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.selsq{border:1px solid var(--line);border-radius:99px;padding:7px 14px;font-size:12.5px;font-family:var(--sans);
+  font-weight:600;color:var(--tinta);background:var(--surface)}
+.selsq:focus{border-color:var(--lila);outline:none}
+
+
+/* ====== Por qué estas preguntas ====== */
+.porque{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px 24px;margin-bottom:16px}
+.porque b{font-family:var(--display);font-size:15px;color:var(--tinta);display:flex;align-items:center;gap:9px}
+.porque b::before{content:"";width:5px;height:17px;border-radius:99px;background:linear-gradient(180deg,var(--morado),var(--naranja))}
+.porque p{font-size:13.5px;color:var(--muted);margin:8px 0 0;line-height:1.6;max-width:64ch}
+.porque .met{font-size:12.5px;color:var(--faint);margin-top:10px}
+.vch{display:flex;gap:9px;flex-wrap:wrap;margin-top:11px}
+.vc{font-size:12.5px;font-weight:600;padding:5px 12px;border-radius:99px;display:flex;align-items:center;gap:7px}
+.vc i{width:7px;height:7px;border-radius:50%;display:block}
+.vc.f{background:#FBE9E7;color:#B3261E}.vc.f i{background:#B3261E}
+.vc.m{background:var(--duraznoSuave);color:#C24A00}.vc.m i{background:#C24A00}
+.vc.ok{background:#E6F4EC;color:#1E7A4B}.vc.ok i{background:#1E7A4B}
+
+/* ====== Matriz con instrucciones al lado ====== */
+.mgrid{display:grid;grid-template-columns:250px 1fr;gap:22px;align-items:start;margin-top:6px}
+@media(max-width:900px){.mgrid{grid-template-columns:1fr}}
+.minstr{display:flex;flex-direction:column;gap:14px}
+.ins{display:flex;gap:11px;align-items:flex-start}
+.ins b{font-family:var(--display);font-size:12.5px;color:var(--tinta);display:block}
+.ins p{font-size:12px;color:var(--muted);margin:2px 0 0;line-height:1.5}
+.ic{width:30px;height:30px;border-radius:9px;background:var(--paper);flex:0 0 30px;display:flex;
+  align-items:center;justify-content:center;gap:3px;position:relative}
+.ic.ejes span{position:absolute;background:var(--lila);border-radius:2px}
+.ic.ejes span:first-child{width:2px;height:16px;left:9px;top:7px}
+.ic.ejes span:last-child{width:16px;height:2px;left:9px;top:21px}
+.ic.tam i{border-radius:50%;background:var(--lila);display:block}
+.ic.tam .g{width:13px;height:13px}.ic.tam .p{width:7px;height:7px}
+.ic.col{gap:2px}.ic.col i{width:5px;height:12px;border-radius:2px;display:block}
+.ic.pun::after{content:"";width:15px;height:15px;border-radius:50%;border:2px dashed var(--lila)}
+.grafo{min-width:520px}
+.grafo .qt{font-size:11.5px}
+.mcodigos{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;border-top:1px solid var(--paper);padding-top:14px}
+.mc{display:flex;align-items:center;gap:8px;background:var(--paper);border:1px solid transparent;border-radius:99px;
+  padding:5px 13px 5px 5px;cursor:pointer;font-family:var(--sans);transition:all .14s}
+.mc:hover{border-color:var(--lila);background:#FBF9FF}
+.cbadge{width:24px;height:24px;border-radius:50%;color:#fff;font-size:11px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;flex:0 0 24px}
+.cn{font-size:12.5px;font-weight:600;color:var(--tinta)}
+.cs{font-size:11px;color:var(--faint)}
+
+/* ====== Podio ====== */
+.podioHead{margin-top:10px;display:flex;justify-content:space-between;gap:22px;align-items:flex-start;flex-wrap:wrap}
+.podioHead p{font-size:13px;color:var(--muted);margin:0;line-height:1.6;max-width:62ch}
+.podioHead b{color:var(--tinta)}
+.escala{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;color:var(--faint);
+  font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
+.escala i{width:3px;height:30px;border-radius:99px;background:linear-gradient(180deg,var(--morado),var(--naranja))}
+.pp{position:relative}
+.corte{position:absolute;left:0;right:0;bottom:-5px;height:2px;border-radius:2px;
+  background:repeating-linear-gradient(90deg,var(--lila) 0 7px,transparent 7px 13px)}
+
+footer{border-top:1px solid var(--line);padding:20px;text-align:center;font-size:12px;color:var(--faint)}
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="marca">
+    <svg width="52" height="30" viewBox="0 0 600 341" role="img" aria-label="Spin"><path d="M75.3183 120.54C90.9065 120.54 104.168 124.162 115.785 135.064L138.336 108.627C119.442 92.1175 100.197 87.172 74.6534 87.172C44.7883 87.172 5.65164 100.391 5.65164 138.024C5.65164 175.014 42.4797 186.229 73.3236 188.545C96.5397 189.869 105.83 194.483 105.83 205.716C105.83 217.611 91.5529 225.535 76.2972 225.204C58.0494 224.873 31.5273 215.295 19.91 202.426L0 231.161C23.881 255.943 49.7566 260.227 75.6323 260.227C122.415 260.227 145.964 235.463 145.964 206.728C145.964 163.468 106.809 156.537 75.9647 154.552C55.0758 153.228 45.4532 147.29 45.4532 136.719C45.4532 126.478 56.0732 120.54 75.3183 120.54Z" fill="#5601D9"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M261.009 260.32C314.256 260.32 344.916 222.08 344.916 173.784C344.916 125.156 310.876 87.2472 259.661 87.2472C240.785 87.2472 218.548 95.2996 205.748 113.739L203.052 90.9241H164.636V289.883C176.678 302.09 190.511 312.515 205.748 320.732V236.825C217.532 254.952 243.481 260.32 261.009 260.32ZM256.613 126.829C286.257 126.829 303.784 147.953 303.784 173.784C303.784 199.614 284.576 220.738 256.613 220.738C228.651 220.738 209.442 199.614 209.442 173.784C209.442 147.953 226.97 126.829 256.613 126.829Z" fill="#5601D9"></path><path d="M368.666 87.2472H409.779V173.701V260.155H368.666V87.2472Z" fill="#5601D9"></path><path d="M558.869 168.838V260.155H600V168.507C600 116.516 568.657 87.3391 529.576 87.3391C508.669 87.3391 491.825 95.7225 474.981 112.158L472.265 87.2472H435.53V260.155H476.31V170.861C476.31 145.692 493.505 124.568 518.771 124.568C545.053 124.568 558.869 143.688 558.869 168.838Z" fill="#5601D9"></path><path d="M366.86 13.0631C364.699 14.2765 362.667 15.6921 360.802 17.31C355.593 21.8694 351.992 27.8812 350.292 34.6835C345.601 32.1832 340.762 29.9403 335.775 27.9915C326.781 24.4616 317.361 21.7959 307.684 20.1045L305.874 19.7735C305.569 19.7276 305.264 19.6862 304.959 19.6449C304.655 19.6035 304.35 19.5621 304.045 19.5162L300.388 19.0198C299.33 18.8442 298.272 18.7518 297.202 18.6583C297.039 18.6441 296.876 18.6299 296.713 18.6153L293.019 18.2844C288.087 18.027 283.101 17.7696 278.132 17.9718C268.177 18.2476 258.186 19.4978 248.36 21.7591C238.516 24.002 228.893 27.3848 219.621 31.6684C201.078 40.2357 184.031 52.6821 169.957 68.1988C181.944 51.0275 197.55 36.0624 215.761 24.6271C224.867 18.9278 234.6 14.0191 244.832 10.2687C255.046 6.48142 265.721 3.72372 276.618 2.01395C282.066 1.09472 287.57 0.653485 293.111 0.249022L297.267 0.0835599C297.61 0.0744443 297.955 0.0630689 298.3 0.0516747C299.347 0.0171079 300.399 -0.0176326 301.441 0.0100212L305.615 0.0467905C305.959 0.0560433 306.307 0.0606393 306.658 0.0652659C307.005 0.069832 307.353 0.074428 307.702 0.0835599L309.789 0.193868C320.945 0.708639 332.119 2.34487 343.089 5.10257C351.179 7.12489 359.121 9.79066 366.86 13.0631Z" fill="#FC630E"></path><path d="M389.976 20.2341C388.96 20.2341 387.926 20.2892 386.91 20.4179C376.66 21.5578 367.148 28.4704 365.855 41.1558C365.763 42.1118 365.707 43.123 365.707 44.1525C365.707 60.092 377.842 68.0526 389.976 68.0526C402.11 68.0526 414.245 60.092 414.245 44.1525C414.245 28.1946 402.11 20.2341 389.976 20.2341Z" fill="#FC630E"></path><path d="M357.163 314.572C338.62 321.577 318.95 324.758 299.649 324.132C280.33 323.563 261.436 319.169 244.333 311.465C235.117 307.329 226.436 302.218 218.439 296.335V327.681C224.183 330.126 230.038 332.259 235.985 334.023C256.985 340.329 278.982 342.333 300.259 340.146C321.536 338.013 342.147 331.725 360.525 321.853C378.92 311.999 395.062 298.633 407.917 282.932C393.086 296.813 375.706 307.586 357.163 314.572Z" fill="#FC630E"></path></svg>
+    <div class="sep"></div>
+    <div class="prod">Árbitro de priorización</div>
+  </div>
+  
+  <nav>
+    <button id="nav-inicio" class="on" onclick="ir('inicio')">Nueva evaluación</button>
+    <button id="nav-ini" onclick="ir('ini')">Iniciativas por squad</button>
+    <button id="nav-exp" onclick="ir('exp')">Tablero de priorización</button>
+  </nav>
+</header>
+
+<main id="main"></main>
+<div id="areaImpresion" aria-hidden="true"></div>
+
+<footer>
+  Árbitro de priorización · Spin
+</footer>
+
+<script>
+/* ============================================================
+   Árbitro de priorización — Spin · Háptica · v0.2
+   Archivo único. Funciona sin conexión con el motor local.
+   Si pegas una API key de Anthropic, evalúa con el modelo.
+   ============================================================ */
+
+const CORPUS_EJEMPLO=[
+ {id:"MM-01",squad:"Money Movement",nombre:"Transferencias programadas",objetivo:"Subir frecuencia de uso mensual",estado:"En construcción",kw:["transferencia","programad","recurrente"]},
+ {id:"MM-02",squad:"Money Movement",nombre:"Alertas de envío fallido",objetivo:"Reducir contactos a soporte por pagos",estado:"En diseño",kw:["envío fallido","alerta","notificaci","push"]},
+ {id:"MM-03",squad:"Money Movement",nombre:"Límites dinámicos por perfil de riesgo",objetivo:"Reducir fricción en montos altos",estado:"Priorizada",kw:["aumento de límite","perfil de riesgo","límite de transferencia"]},
+ {id:"MM-04",squad:"Money Movement",nombre:"Historial unificado de movimientos",objetivo:"Reducir contactos a soporte",estado:"En definición",kw:["historial unificado","consulta de movimientos"]},
+ {id:"CX-01",squad:"Card Experience",nombre:"Alertas de consumo en tiempo real",objetivo:"Subir activación de tarjeta",estado:"En definición",kw:["consumo","tarjeta","alerta"]},
+ {id:"CX-02",squad:"Card Experience",nombre:"Congelar y descongelar tarjeta",objetivo:"Reducir reposiciones",estado:"Priorizada",kw:["congelar","bloquear la tarjeta"]},
+ {id:"CX-03",squad:"Card Experience",nombre:"Rediseño del detalle de movimiento",objetivo:"Reducir contactos a soporte",estado:"En diseño",kw:["detalle del movimiento","comercio"]},
+ {id:"CX-04",squad:"Card Experience",nombre:"Notificaciones push de corte",objetivo:"Subir recurrencia de uso",estado:"Despriorizada",kw:["corte","recordatorio","fecha de pago"]},
+ {id:"SL-01",squad:"Segment-led",nombre:"Onboarding diferenciado por segmento",objetivo:"Subir conversión de registro",estado:"En construcción",kw:["onboarding","registro"]},
+ {id:"SL-02",squad:"Segment-led",nombre:"Beneficios segmentados por comportamiento",objetivo:"Subir retención a 90 días",estado:"En definición",kw:["beneficio","segmento","recompensa"]},
+ {id:"SL-03",squad:"Segment-led",nombre:"Reactivación de usuarios inactivos",objetivo:"Subir usuarios activos mensuales",estado:"Priorizada",kw:["inactiv","reactiva","campaña"]},
+ {id:"SL-04",squad:"Segment-led",nombre:"Encuesta in-app de satisfacción",objetivo:"Levantar voz del cliente",estado:"En diseño",kw:["encuesta","satisfacción"]}
+];
+
+const SEM={
+ verde:{t:"Sustentada",c:"var(--morado)",c2:"#9B6BFF",bg:"var(--verdeSoft)",d:"Está lista para que la mesa la discuta."},
+ amarillo:{t:"Falta información",c:"var(--naranja)",c2:"#FFA366",bg:"var(--ambarSoft)",d:"Se puede llevar a la mesa sabiendo qué falta."},
+ rojo:{t:"No evaluable",c:"var(--grisOsc)",c2:"#5C6370",bg:"var(--rojoSoft)",d:"Hay algo que resolver antes de llevarla."}
+};
+
+/* ---- Lo que un PRD de Spin tiene que traer ----
+   Calibrado contra cinco PRDs reales: Cash In OXXO, Mapa ICash, Link de pago,
+   Agente NBA y P2P Money Movement. Dos niveles:
+   esencial — así escribe Spin hoy, y su ausencia es una falla real.
+   mejora   — sube el estándar, todavía no es práctica en Spin. No hunde el veredicto. */
+const ELEMENTOS=[
+ ["Contexto del negocio","esencial",/contexto|hoy (el|la|los|las)|actualmente|spin by oxxo|sbo\b|el flujo|ecosistema/i],
+ ["Problema y a quién le pasa","esencial",/problema|fricci|no puede|desconoc|no saben|pierden|frustra|need\b|dolor|limitad/i],
+ ["Cuánto pesa hoy","esencial",/\d+\s*%|\bMAU|transaccion|# ?trx|volumen|usuarios activos|\d[\d.,]*\s*(mil|millones)/i],
+ ["La hipótesis","esencial",/hip[óo]tesis|si .{5,60} entonces|esperamos que|buscamos|apostamos|assumption/i],
+ ["KPI primario y su target","esencial",/kpi|m[ée]trica|target|objetivo de \d|primario|optimista|conservador|north star/i],
+ ["Cómo y dónde se mide","esencial",/medici[óo]n|dashboard|tablero|se mide|evento|instrumentar|tracking|amplitude|looker/i],
+ ["La solución","esencial",/soluci[óo]n|propuesta|vamos a|consiste en|la funcionalidad|el flujo propuesto/i],
+ ["Plan de entrega","esencial",/fase|roll ?-?out|piloto|lanzamiento|etapa|primera versi[óo]n|mvp\b|regi[óo]n|despliegue/i],
+ ["Diferenciador frente al mercado","esencial",/competencia|competidor|ning[úu]n banco|fintech|diferenciador|frente a|mercado|benchmark/i],
+ ["Dueño y equipo","esencial",/due[ñn]o|tech lead|stakeholder|responsable|owner|equipo|@spin\.co/i],
+ ["Evidencia o análisis previo","esencial",/an[áa]lisis|research|entrevistas?|encuesta|estudio|datos de|rese[ñn]as|tickets|uplift|piloto previo|resultados/i],
+ ["Qué NO se va a hacer","mejora",/no vamos a|no haremos|fuera de alcance|no incluye|queda fuera|out of scope|no contempla/i],
+ ["Qué se recorta si no alcanza","mejora",/si no (alcanza|est[áa] listo|llega)|recortamos|sale sin|dejamos fuera|salimos con|se posterga/i],
+ ["Riesgo técnico y dependencias","mejora",/riesgo|depende de|dependencia|complejidad|latencia|no soporta|mitigaci[óo]n|core\b|proveedor/i],
+ ["Cómo se revierte si sale mal","mejora",/revertir|rollback|feature flag|apagar|desactivar|volver atr[áa]s|plan b\b/i]
+];
+
+/* ---- Vocabulario real de Spin ---- */
+const OBJETIVO=/\bMAU|transaccional|recurrencia|adquisici|activaci|retenci|churn|ingreso|comisi|volumen|# ?trx|transaccion|cash ?in|cash ?out|spei|p2p|retiro|dep[óo]sito|soporte|fricci|conversi|objetivo de negocio|negocio/i;
+const SENAL={
+  tamano:/\d+\s*%\s*(de\s*)?(los\s*)?(MAU|usuarios|clientes)|\bMAU|\d[\d.,]*\s*(mil|millones|k\b)\s*(de\s*)?(usuarios|trx|transaccion)|# ?trx|volumen de/i,
+  mejora:/\d+\s*(%|puntos|por ciento|percent)|\d[\d.,]{2,}\s*(trx|transaccion|usuarios)|a la mitad|al doble|de \d+\s*a\s*\d+|optimista|conservador/i,
+  evidencia:/an[áa]lisis|research|investigaci[óo]n|entrevistas?|encuesta|estudio|rese[ñn]as|tickets|dashboard|tablero|datos de|uplift|piloto|regi[óo]n .{0,20}encendida|resultados/i,
+  cifra:/\d[\d.,]*\s*(%|por ciento|usuarios|casos|tickets|trx|transaccion|MAU|mil|millones|personas|tiendas)/i,
+  intuicion:/creemos|pensamos|sentimos|nos parece|intuimos|seguramente|deber[íi]a funcionar/i,
+  hipotesis:/hip[óo]tesis|si .{5,80} entonces|esperamos (que|lograr)|apostamos/i,
+  mandato:/mandato|nos lo pidi|viene de (arriba|direcci[óo]n)|el comit[ée]|regulatori|por normativa|obligatorio por|compliance exige/i,
+  desplaza:/desplaza|en vez de|entra en lugar de|sacamos|posterga|se corre|sale del backlog|prioriza sobre/i,
+  vanidad:/visitas|descargas|impresiones|clicks|clics|likes|seguidores|usuarios registrados|page ?views/i,
+  kpi:/kpi|m[ée]trica|north star|indicador|c[óo]mo sabemos|target/i,
+  target:/target|meta|objetivo de \d|optimista|conservador|\d+\s*%|\d[\d.,]{2,}\s*(trx|transaccion)/i,
+  medicion:/medici[óo]n|dashboard|tablero|se mide|amplitude|looker|evento|instrumentar|tracking/i,
+  plazo:/\d+\s*(d[íi]as|semanas|meses)|trimestre|Q[1-4]|primer semestre|antes de/i,
+  base:/hoy (estamos|son|es|el)|l[íi]nea base|actualmente (es|son|estamos)|hoy tenemos|baseline/i,
+  fases:/fase \d|fase [a-z]|roll ?-?out|piloto|etapa \d|lanzamiento inicial|primera versi[óo]n|mvp\b|despliegue|por regiones?/i,
+  recorte:/si no (alcanza|est[áa] listo|llega)|recortamos|sale sin|dejamos fuera|salimos con|se posterga|queda para (una )?fase/i,
+  vago:/cuando (desarrollo|haya|se pueda|tengamos)|lo antes posible|cuanto antes|sin fecha|por definir|TBD/i,
+  areas:/\bdata\b|legal|seguridad|riesgos|compliance|operaciones|otro squad|infra|plataforma|tech lead|stakeholder|proveedor|core\b|tiendas? oxxo|oxxo (tiene|debe|habilita|opera)/i,
+  instrumenta:/evento|instrumentar|tracking|anal[íi]tica|capturar|dashboard|tablero/i,
+  tecnico:/api\b|latencia|core\b|backend|servicio de|integraci[óo]n|deeplink|modelo\b/i,
+  competencia:/competencia|competidor|ning[úu]n banco|otros bancos|fintech|diferenciador|frente a la competencia|benchmark|mercado/i,
+  existente:/ya (existe|intentamos|hicimos|hay|se intent|contamos)|hoy ya|(modelo|funcionalidad|flujo|motor|herramienta)\s[\wáéíóú\s]{0,20}actual|versi[óo]n anterior|alternativa|evaluamos|consideramos|en vez de/i
+};
+const INGLES=/\b(the|and|of|with|for|user|users|problem|goal|metric|we will|should|feature|release)\b/gi;
+const ESPANOL=/\b(el|la|los|las|de|que|para|con|usuario|problema|objetivo|semana|vamos|queremos)\b/gi;
+
+/* ---- Banco fijo, en el idioma del negocio ---- */
+const BANCO={
+ c1:["¿A qué objetivo de negocio le pega esto y cómo se vería en los números de Spin?","¿A cuántos MAUs les pasa esto hoy? Necesito el porcentaje o el volumen, no “muchos usuarios”."],
+ c2:["¿Qué análisis, dashboard o piloto respalda que esto pasa? Dime la cifra y de cuándo es.","¿Esto sale de datos, de un mandato o de una intuición del equipo? ¿Qué te hace estar seguro?"],
+ c3:["¿Cuál es el KPI primario, con qué target y en cuánto tiempo?","¿Cuánto vale hoy ese número y dónde se va a medir? Sin línea base no vas a poder demostrar que mejoró."],
+ c4:["¿Cómo sale esto: en fases, con piloto, por región? ¿Y qué entra en la primera?","Si la primera fase no da los números, ¿qué haces? ¿Sigues, ajustas o lo apagas?"],
+ c5:["¿Qué necesitas de Data, Legal, Riesgos, del core o de OXXO para que esto salga?","¿Qué evento hay que capturar para poder medir esto, y ya existe o hay que crearlo?"],
+ c6:["¿Qué hace hoy la competencia con esto? ¿Esto nos diferencia o nos empareja?","¿Ya existe algo en Spin que resuelva parte de esto? ¿Qué pasó con ello?"]
+};
+
+/* ---- Cómo se ve un criterio bien resuelto, con el estándar de Spin ---- */
+const EJEMPLO={
+ c1:"El cash in en OXXO es un flujo central: el 54% de los MAUs deposita en tienda. Esta iniciativa le pega directo a transaccionalidad y al volumen de depósitos.",
+ c2:"El análisis de la región Pacífico encendida no mostró uplift: las plazas piloto replicaron el comportamiento de las plazas sin el beneficio. Lo decimos aunque no nos favorezca.",
+ c3:"KPI primario: transacciones de cash in entre 10pm y 12am en tiendas habilitadas. Target optimista 9%, conservador 5%, medido en dashboard a 6 meses.",
+ c4:"Roll-out en tres fases: Pacífico para validar operación, luego dos regiones más, después nacional. Si la fase 1 no mueve el número, no seguimos.",
+ c5:"Data instrumenta el evento de depósito nocturno, Riesgos valida el límite por horario y OXXO tiene que habilitar las tiendas. Los tres ya están enterados.",
+ c6:"Ningún banco ni fintech competidor ha extendido este horario: todos operan hasta las 10pm. Es un diferenciador sostenible, no un empate."
+};
+
+/* ---- PRDs de ejemplo ---- */
+const PRD_V1=`Alertas de consumo en tiempo real
+Squad: Card Experience - Payments
+
+1. Contexto
+Muchos usuarios de Spin by OXXO usan su tarjeta y no saben cuánto llevan gastado en el mes.
+
+2. Problema
+Los usuarios se enteran de sus consumos hasta el corte. Eso genera frustración y sensación de poco control sobre su dinero.
+
+3. Solución
+Mandar una notificación push con el monto y el comercio apenas se registra el movimiento. También mostrar un acumulado del mes dentro de la app.
+
+Creemos que esto va a mejorar mucho la experiencia y la percepción de control. Es algo que piden los usuarios en las reseñas de la tienda.
+
+Arrancamos cuando desarrollo tenga espacio.`;
+
+const PRD_V2=`Alertas de consumo en tiempo real
+Squad: Card Experience - Payments
+Dueño del documento: PM de Card Experience
+
+1. Contexto
+La tarjeta es uno de los flujos centrales de Spin by OXXO: el 29% de los MAUs hace cash out con tarjeta y el consumo crece mes a mes. Hoy el usuario no tiene visibilidad de su gasto hasta el corte.
+
+2. Problema
+Los tarjetahabientes nuevos activan la tarjeta y dejan de usarla en las primeras dos semanas. El análisis de 1,400 reseñas de tienda entre junio y agosto muestra que el 31% menciona que no sabe cuánto lleva gastado.
+
+3. Oportunidad
+Hipótesis: si el usuario ve cada consumo en el momento en que ocurre, entonces mantiene la tarjeta activa más allá de la semana 4.
+
+KPI primario: porcentaje de tarjetas activadas con al menos tres consumos en la semana 4.
+Hoy estamos en 38%. Target conservador 44%, optimista 47%. Medición: dashboard de activación, a 60 días del lanzamiento.
+
+4. Solución
+Notificación push con monto y comercio apenas se registra el movimiento, y acumulado del mes visible desde la notificación.
+
+5. Plan de entrega
+Fase 1: piloto con el 10% de la base para validar latencia. Fase 2: nacional.
+
+6. Dependencias
+Data instrumenta el evento de consumo. Legal revisa el texto de la notificación. El core de tarjetas tiene que exponer el movimiento en menos de un minuto.`;
+
+const PRD_MM=`Límites dinámicos por perfil de riesgo
+Squad: Money Movement - Payments
+Dueño del documento: PM de Money Movement · Tech Lead y Riesgos como stakeholders
+
+1. Contexto
+SPEI Out es uno de los flujos más usados de Spin by OXXO: el 62% de los MAUs envía dinero, y el 88% lo hace a cuentas de terceros. Hoy todos los usuarios comparten el mismo límite de transferencia, sin importar su historial.
+
+2. Problema
+Los usuarios con buen historial chocan con el mismo tope que un usuario nuevo. El tablero de Operaciones registra 1,400 solicitudes manuales de aumento de límite al mes, medidas entre mayo y agosto, que hoy se resuelven a mano y tardan hasta 48 horas.
+
+3. Oportunidad
+Hipótesis: si el límite sube solo cuando el perfil de riesgo lo permite, entonces bajan las solicitudes manuales y aumenta el volumen transaccionado por los usuarios de mayor antigüedad.
+
+KPI primario: solicitudes manuales de aumento por cada mil usuarios activos. Hoy son 9. Target conservador 6, optimista 4,5. Medición: dashboard de Operaciones, a 90 días.
+KPI secundario: volumen SPEI Out del segmento habilitado.
+
+4. Diferenciador frente al mercado
+Los bancos tradicionales exigen trámite en sucursal o llamada para subir el límite. Ninguna fintech del mercado local lo hace automático por perfil de riesgo: sería un diferenciador sostenible.
+
+5. Solución
+Motor de reglas que ajusta el límite según el perfil de riesgo del usuario, sin que tenga que pedirlo.
+
+6. Plan de entrega
+Fase 1: usuarios con más de doce meses de antigüedad y sin incidencias. Fase 2: resto del segmento elegible. Si la fase 1 no baja las solicitudes, sale sin la fase 2 y se revisa la tabla de perfiles.
+
+7. Dependencias y riesgos
+Riesgos define la tabla de perfiles. Data instrumenta el evento de cambio de límite. Legal revisa la comunicación al usuario. El motor de reglas actual no soporta condiciones compuestas: arrancamos con tres reglas simples. Podemos desactivar con feature flag.
+
+8. Qué no vamos a hacer
+No aplica a usuarios nuevos ni cambia el proceso de KYC.`;
+
+/* ============================================================ MOTOR LOCAL */
+function frases(t){return t.split(/(?<=[.!?])\s+|\n+/).map(s=>s.trim()).filter(s=>s.length>20);}
+function corta(s,n){s=(s||"").replace(/\s+/g," ").trim();const w=s.split(" ");n=n||16;return w.length>n?w.slice(0,n).join(" ")+"…":s;}
+function hay(fs,re){return fs.find(s=>re.test(s));}
+function mejor(fs,re,extra){
+  const cand=fs.filter(s=>re.test(s));
+  if(!cand.length)return "";
+  return cand.map(s=>{
+    let p=0;
+    if(/\d/.test(s))p+=3;
+    if(/%|trx|MAU|puntos|mil|millones/.test(s))p+=2;
+    if(extra&&extra.test(s))p+=4;
+    if(s.length>60&&s.length<220)p+=1;
+    return[p,s];
+  }).sort((a,b)=>b[0]-a[0])[0][1];
+}
+function contar(t,re){return (t.match(re)||[]).length;}
+
+/* ---- Un evaluador por criterio, con el estándar de los PRDs de Spin ---- */
+const EVAL={
+ /* 1. Alineación: a qué objetivo de negocio le pega y cuánto pesa */
+ c1(t,fs){
+  const obj=hay(fs,OBJETIVO);
+  if(!obj)return{estado:"ausente",cita:"",nota:"Todavía no dice a qué objetivo de negocio le pega ni qué mueve en Spin."};
+  const tam=SENAL.tamano.test(t), mej=SENAL.mejora.test(t);
+  if(tam&&mej)return{estado:"sustentado",cita:corta(mejor(fs,SENAL.tamano,OBJETIVO)),nota:"Dice a qué objetivo le pega, cuánto pesa hoy y cuánto espera moverlo."};
+  if(tam)return{estado:"sustentado",cita:corta(mejor(fs,SENAL.tamano,OBJETIVO)),nota:"Nombra el objetivo y el peso del flujo en MAUs o volumen."};
+  if(mej)return{estado:"débil",cita:corta(mejor(fs,OBJETIVO,SENAL.mejora)),nota:"Hay objetivo y meta, pero no dice qué porcentaje de MAUs o qué volumen toca."};
+  return{estado:"débil",cita:corta(obj),nota:"Menciona el objetivo sin decir cuánto pesa hoy ese flujo."};
+ },
+ /* 2. Evidencia: con qué se sostiene que el problema existe */
+ c2(t,fs){
+  if(SENAL.mandato.test(t)){
+    const cita=corta(mejor(fs,SENAL.mandato));
+    if(SENAL.desplaza.test(t))return{estado:"sustentado",cita,nota:"Entra por mandato y dice qué desplaza. Eso basta.",origen:"mandato"};
+    return{estado:"débil",cita,nota:"Entra por mandato. No lo cuestiono, pero falta decir qué desplaza.",origen:"mandato"};
+  }
+  let evc=fs.find(s=>SENAL.evidencia.test(s)&&SENAL.cifra.test(s));
+  const ev=hay(fs,SENAL.evidencia);
+  if(!evc&&ev){ /* la cifra puede estar cerca, no en la misma frase */
+    const pos=t.indexOf(ev.slice(0,40));
+    if(pos>=0&&SENAL.cifra.test(t.slice(Math.max(0,pos-260),pos+420)))evc=ev;
+  }
+  if(evc)return{estado:"sustentado",cita:corta(evc),nota:"Trae análisis con cifra, no una impresión del equipo.",origen:"evidencia"};
+  if(ev)return{estado:"débil",cita:corta(ev),nota:"Cita una fuente sin número ni periodo. ¿Cuántos casos y de cuándo?",origen:"evidencia"};
+  if(SENAL.cifra.test(t))return{estado:"débil",cita:corta(mejor(fs,SENAL.cifra)),nota:"Hay cifras, pero no dice de qué análisis o dashboard salen.",origen:"dato suelto"};
+  if(SENAL.intuicion.test(t))return{estado:"débil",cita:corta(mejor(fs,SENAL.intuicion)),nota:"Es una intuición del equipo. Puede ser correcta, pero no es evidencia.",origen:"supuesto"};
+  return{estado:"ausente",cita:"",nota:"Todavía no dice con qué datos se sostiene que esto pasa.",origen:"sin declarar"};
+ },
+ /* 3. Impacto: hipótesis, KPI primario, target y medición */
+ c3(t,fs){
+  if(SENAL.vanidad.test(t)&&!SENAL.mejora.test(t))
+    return{estado:"débil",cita:corta(mejor(fs,SENAL.vanidad)),nota:"Esa métrica sube aunque el producto no sirva. Necesito una que mida valor."};
+  const k=hay(fs,SENAL.kpi)||hay(fs,SENAL.mejora);
+  if(!k)return{estado:"ausente",cita:"",nota:"Todavía no hay un número que diga si esto funcionó."};
+  const hip=SENAL.hipotesis.test(t), num=SENAL.mejora.test(t), med=SENAL.medicion.test(t), lb=SENAL.base.test(t);
+  const cita=corta(mejor(fs,SENAL.kpi,SENAL.mejora));
+  if(num&&med&&hip)return{estado:"sustentado",cita,nota:lb?"Hipótesis, KPI con target, medición declarada y línea base.":"Hipótesis, KPI con target y dónde se mide. Falta el valor de hoy."};
+  if(num&&med)return{estado:"sustentado",cita,nota:"KPI con target y medición declarada. Sin hipótesis explícita no se sabe qué se está probando."};
+  if(num)return{estado:"débil",cita,nota:"Hay target, pero no dice dónde se va a medir ni cuánto vale hoy."};
+  return{estado:"débil",cita:corta(k),nota:"Nombra qué va a medir, pero sin target no es una meta."};
+ },
+ /* 4. Plan de entrega: fases, piloto y qué pasa si la primera no da */
+ c4(t,fs){
+  const f=hay(fs,SENAL.fases);
+  const noEsPlazo=/(m[áa]s de|menos de|hace|[úu]ltim|primer|cada|durante|antig[üu]edad de)\s+\w*\s*(\d+|una?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce)?\s*(semanas?|meses|d[íi]as)/i;
+  const plazo=fs.find(s=>SENAL.plazo.test(s)&&!noEsPlazo.test(s)&&!/problema|dejan de|abandonan/i.test(s));
+  if(!f&&!plazo&&SENAL.vago.test(t))return{estado:"ausente",cita:corta(mejor(fs,SENAL.vago)),nota:"“Cuando haya espacio” no es un plan. La entrega se decide, no se espera."};
+  if(!f&&!plazo)return{estado:"ausente",cita:"",nota:"Todavía no dice cómo saldría: ni fases, ni piloto, ni fecha."};
+  if(f&&SENAL.recorte.test(t))return{estado:"sustentado",cita:corta(f,22),nota:"Sale por fases y dice qué pasa si la primera no da los números."};
+  if(f)return{estado:"sustentado",cita:corta(f,22),nota:"Hay plan de entrega por fases. Falta decir qué pasa si la primera no rinde."};
+  return{estado:"débil",cita:corta(plazo),nota:"Hay una fecha, pero no un plan de salida por fases ni un piloto."};
+ },
+ /* 5. Dependencias: quién más tiene que entrar y qué hay que instrumentar */
+ c5(t,fs){
+  const a=hay(fs,SENAL.areas), inst=SENAL.instrumenta.test(t);
+  if(a&&inst)return{estado:"sustentado",cita:corta(mejor(fs,SENAL.areas,SENAL.instrumenta)),nota:"Nombra las áreas que entran y qué hay que instrumentar."};
+  if(a)return{estado:"débil",cita:corta(a),nota:"Nombra áreas, pero no dice qué evento hay que capturar para medir."};
+  if(inst)return{estado:"débil",cita:corta(mejor(fs,SENAL.instrumenta)),nota:"Habla de medición, pero no dice con quién se construye."};
+  if(SENAL.tecnico.test(t))return{estado:"débil",cita:corta(mejor(fs,SENAL.tecnico)),nota:"Menciona una pieza técnica, pero no a las áreas que tienen que entrar."};
+  return{estado:"ausente",cita:"",nota:"Todavía no menciona a nadie fuera del squad. En Spin casi nunca es cierto."};
+ },
+ /* 6. Diferenciación: frente al mercado y frente a lo que ya existe en Spin */
+ c6(t,fs){
+  const comp=hay(fs,SENAL.competencia), ex=hay(fs,SENAL.existente);
+  if(comp&&ex)return{estado:"sustentado",cita:corta(mejor(fs,SENAL.competencia)),nota:"Se compara con el mercado y con lo que Spin ya tiene."};
+  if(comp)return{estado:"sustentado",cita:corta(comp),nota:"Dice qué hace la competencia y por qué esto diferencia."};
+  if(ex)return{estado:"débil",cita:corta(ex),nota:"Revisa lo que ya existe en Spin, pero no mira al mercado."};
+  return{estado:"ausente",cita:"",nota:"Todavía no dice qué hace la competencia ni si ya existe algo parecido en Spin."};
+ }
+};
+const RIESGO={c1:"valor",c2:"valor",c3:"viabilidad de negocio",c4:"factibilidad",c5:"factibilidad",c6:"viabilidad de negocio",cu:"usabilidad"};
+const USABILIDAD=[
+ "Cuando esto salga, ¿el usuario va a entender qué pasó sin que nadie se lo explique?",
+ "¿Dónde aparece esto en el recorrido del usuario, y qué tiene que hacer distinto a lo que hace hoy?"
+];
+const NOMBRES={c1:"Alineación al negocio",c2:"Evidencia",c3:"Impacto medible",c4:"Plan de entrega",c5:"Dependencias",c6:"Diferenciación"};
+
+function evaluarLocal(txt,otros){
+  const fs=frases(txt), avisos=[];
+  const en=contar(txt,INGLES), es=contar(txt,ESPANOL);
+  if(en>es&&en>4)avisos.push("Tu documento parece estar en inglés. Puedo leerlo, pero mis preguntas y el acta salen en español.");
+  const pistas=["problema","usuari","cliente","queremos","quisiera","se me ocurr","podriamos|podríamos","objetivo","m[ée]trica","kpi","fase","lanzar","producto","iniciativa","squad","flujo","pantalla","app\\b","notificaci","tarjeta","soporte","transaccion","problem","target user"]
+    .filter(p=>new RegExp(p,"i").test(txt)).length;
+  if(pistas<2)avisos.push("Esto no se parece mucho a una iniciativa de producto. Lo reviso igual, pero si te marco casi todo como faltante, seguramente el problema sea el texto y no tu idea.");
+  if(otros&&otros.length){
+    const cab=txt.slice(0,90).toLowerCase().replace(/\s+/g," ");
+    const gem=otros.find(o=>o.prd&&o.prd.slice(0,90).toLowerCase().replace(/\s+/g," ").slice(0,45)===cab.slice(0,45));
+    if(gem)avisos.push("Ya evaluaste algo muy parecido: “"+gem.nombre+"”. Si es una versión nueva, guárdala como tal para poder compararlas.");
+  }
+
+  const admisibilidad=ELEMENTOS.map(([elemento,nivel,re])=>{
+    const f=hay(fs,re);
+    const estado=f?(f.length>45?"declarado":"insinuado"):(re.test(txt)?"insinuado":"ausente");
+    return{elemento,nivel,estado};
+  });
+
+  const minimos=[];
+  if(!ELEMENTOS[1][2].test(txt))minimos.push("el problema");
+  if(!/usuario|usuaria|cliente|tarjetahabiente|segmento|target user|spinner|persona/i.test(txt))minimos.push("quién lo tiene");
+  if(!OBJETIVO.test(txt))minimos.push("el objetivo de negocio");
+
+  const criterios=["c1","c2","c3","c4","c5","c6"].map(id=>{
+    const r=EVAL[id](txt,fs);
+    return{id,nombre:NOMBRES[id],estado:r.estado,cita:r.cita,nota:r.nota,origen:r.origen};
+  });
+
+  const deps=[];
+  const cab=txt.slice(0,180).toLowerCase();
+  /* el registro manual más todo lo que ya se evaluó en la herramienta */
+  const universo=corpusActual().concat(
+    (otros||[]).filter(o=>o.iniciativa&&o.criterios)
+      .map(o=>({id:o.id,squad:o.squad||"otro squad",nombre:o.iniciativa,objetivo:"",kw:[],evaluada:true}))
+      .filter((o,x,a)=>a.findIndex(y=>norm(y.nombre)===norm(o.nombre))===x));
+  universo.forEach(i=>{
+    if(cab.includes(i.nombre.toLowerCase().slice(0,16)))return;
+    const kws=señasDe(i);
+    const raices=new Set((txt.match(/[A-Za-zÁÉÍÓÚáéíóúñÑ]{5,}/g)||[]).map(raiz));
+    const hits=kws.filter(k=>{
+      const r=raiz(k);
+      if(r&&raices.has(r))return true;
+      try{return new RegExp(k,"i").test(txt);}catch(e){return false;}
+    }).length;
+    if(hits>=3||(hits===2&&kws.length<=3))deps.push({tipo:"solapamiento",iniciativa:i.nombre,squad:i.squad,evaluada:!!i.evaluada,nota:"Resuelven casi lo mismo. Vale la pena hablarlo antes de construir."});
+    else if(hits===2)deps.push({tipo:"dependencia",iniciativa:i.nombre,squad:i.squad,evaluada:!!i.evaluada,nota:"Se tocan en más de un punto. Conviene avisar al squad."});
+  });
+
+  return{admisibilidad,minimos,noEvaluable:minimos.length>=2,criterios,avisos,
+    dependencias:deps.slice(0,3),
+    cobertura:corpusActual().length?"Solo alcanzo a ver las iniciativas que están cargadas. Si hay algo más en marcha, no lo tengo.":"Todavía no hay iniciativas cargadas, así que no puedo decirte si esto choca con lo que hace otro squad."};
+}
+
+function preguntasDe(criterios){
+  const peso=e=>e==="ausente"?0:e==="débil"?1:2;
+  const out=[];
+  criterios.filter(c=>c.estado!=="sustentado")
+   .sort((a,b)=>peso(a.estado)-peso(b.estado))
+   .slice(0,4).forEach((c,i)=>{
+     out.push({id:"p"+i,criterio:c.id,origen:"banco",texto:BANCO[c.id][c.estado==="ausente"?0:1],respuesta:"",nolose:false});
+   });
+  const contraste=[
+    c=>"Dices que "+c.nombre.toLowerCase()+" está resuelto. Si te equivocas justo en eso, ¿qué se cae del resto?",
+    c=>"En "+c.nombre.toLowerCase()+" me apoyé en una frase tuya. ¿Quién más en Spin firmaría ese número hoy?",
+    c=>"Si alguien quisiera matar esta iniciativa en la mesa, ¿por dónde la atacaría?"
+  ];
+  const sust=criterios.filter(c=>c.estado==="sustentado");
+  let k=0;
+  while(out.length<3&&k<sust.length&&k<contraste.length){
+    out.push({id:"px"+k,criterio:sust[k].id,origen:"generada",texto:contraste[k](sust[k]),respuesta:"",nolose:false});k++;
+  }
+  /* Ningún PRD revisado de Spin cubre el riesgo de usabilidad. Siempre se pregunta una. */
+  out.push({id:"pu",criterio:"cu",origen:"usabilidad",respuesta:"",nolose:false,
+            texto:USABILIDAD[out.length%2]});
+  return out;
+}
+
+function semaforoDe(cr,noEval){
+  if(noEval)return"rojo";
+  const a=cr.filter(c=>c.estado==="ausente").length,d=cr.filter(c=>c.estado==="débil").length;
+  if(a>=2)return"rojo";
+  if(a===1||d>=2)return"amarillo";
+  return"verde";
+}
+function lecturaDe(cr,sem){
+  const fl=cr.filter(c=>c.estado!=="sustentado").map(c=>c.nombre.toLowerCase());
+  if(sem==="verde")return"Los seis criterios quedaron sustentados con frases tuyas.";
+  if(sem==="rojo"&&fl.length>=4)return"Es lo normal a esta altura. Te falta definir "+fl.slice(0,3).join(", ")+" y algo más.";
+  return"Lo que falta está en "+fl.slice(0,3).join(", ")+".";
+}
+
+function reevaluarLocal(exp){
+  const cambios=[];
+  const criterios=exp.criterios.map(c=>{
+    const p=exp.preguntas.find(q=>q.criterio===c.id);
+    if(!p)return c;
+    if(p.nolose){
+      if(c.estado!=="ausente")return c;
+      return{...c,nota:c.nota+" El PM declaró que no lo sabe; queda abierto."};
+    }
+    const r=(p.respuesta||"").trim();
+    if(r.length<25)return c;
+    const fsr=frases(r+" ");
+    if(!EVAL[c.id])return c;
+    const sub=EVAL[c.id](r,fsr.length?fsr:[r]);
+    const orden={ausente:0,"débil":1,sustentado:2};
+    if(orden[sub.estado]>orden[c.estado]){
+      cambios.push({criterio:c.nombre,de:c.estado,a:sub.estado,porque:sub.nota});
+      return{...c,estado:sub.estado,cita:corta(r),nota:sub.nota+" Sale de tu respuesta, no del documento."};
+    }
+    if(orden[sub.estado]===orden[c.estado]&&c.estado!=="sustentado"){
+      cambios.push({criterio:c.nombre,de:c.estado,a:c.estado,porque:"Respondiste, pero con lo mismo que ya estaba. "+sub.nota});
+    }
+    return c;
+  });
+  return{criterios,cambios};
+}
+
+function responderLocal(pregunta,exp){
+  const q=pregunta.toLowerCase();
+  const cr=exp.criterios.find(c=>q.includes(c.nombre.toLowerCase())||q.includes(c.nombre.toLowerCase().split(" ")[0]));
+  if(/priorit|priorizar|deber[íi]a hacerlo|lo hago|vale la pena|me conviene/.test(q))
+    return "No me corresponde. Yo evalúo qué tan sólida está la sustentación, no si la iniciativa debe hacerse ni en qué orden va. Eso es de la mesa, con tu acta enfrente.";
+  if(cr&&/por qu[ée]|c[óo]mo|explica|no entiendo|de d[óo]nde/.test(q)){
+    return "En "+cr.nombre.toLowerCase()+" te marqué "+cr.estado+". "+cr.nota+
+      (cr.cita?" Me apoyé en esta frase tuya: “"+cr.cita+"”."
+             :" No encontré ninguna frase del documento en la que apoyarme, y esa es justamente la razón.")+
+      " Si quieres ver cómo se ve ese criterio bien resuelto, vuelve a la lectura: el ejemplo está debajo del criterio.";
+  }
+  if(cr)return "Sobre "+cr.nombre.toLowerCase()+": quedó "+cr.estado+". "+cr.nota+" Si crees que me equivoco, márcalo como desacuerdo y queda escrito en el acta junto a mi lectura.";
+  if(/sem[áa]foro|color|rojo|amarillo|verde|morado|naranja/.test(q))
+    return "El semáforo mide qué tan sólida está la sustentación, no qué tan prioritaria es la iniciativa. Morado quiere decir que está lista para que la mesa la discuta; naranja, que falta información que ya te nombré; gris, que todavía no puedo evaluarla.";
+  if(/vara|criterio|c[óo]mo eval[úu]as|de d[óo]nde sacas/.test(q))
+    return "Mido seis cosas: a qué objetivo de negocio le pega y cuánto pesa, con qué evidencia se sostiene, qué KPI mueve y con qué target, cómo sale por fases, quién más tiene que entrar, y si diferencia frente al mercado. La vara está calibrada contra PRDs reales de Spin, no contra una plantilla genérica.";
+  if(/qui[ée]n eres|qu[ée] haces|para qu[ée] sirves/.test(q))
+    return "Leo tu iniciativa antes de que la lleves a la mesa, te digo qué le falta citando tus propias frases y te hago las preguntas que te van a hacer allá. No decido nada.";
+  if(/ayuda|c[óo]mo lo arreglo|qu[ée] escribo|escr[íi]belo/.test(q))
+    return "No te lo escribo: si yo redacto tu PRD, dejo de poder auditarlo. Lo que sí hago es mostrarte un ejemplo de cómo se ve ese criterio bien resuelto, para que veas el nivel de concreción que hace falta. Vuelve a la lectura y lo encuentras debajo del criterio.";
+  return "No sé responder eso con lo que tengo. Lo que sí puedo: explicarte por qué marqué cualquiera de los seis criterios —escribe el nombre del criterio— o por qué el semáforo quedó como quedó.";
+}
+
+/* ============================================================ CALIFICACIÓN Y PRIORIDAD
+   Dos ejes distintos, a propósito:
+   1. Solidez (0-100): qué tan sustentado está el PRD. Es lo que el agente sabe medir.
+   2. Prioridad estimada (RICE): con los números que el PM declaró, nunca inventados.
+   El agente no decide: pone los dos ejes sobre la mesa.
+   ============================================================ */
+
+/* Peso de cada criterio. Suma 100. Impacto y evidencia pesan más porque son
+   lo que más se repite como vacío en los PRDs revisados de Spin. */
+const PESOS={c1:20,c2:20,c3:25,c4:15,c5:10,c6:10};
+const VALOR={sustentado:1,"débil":0.5,ausente:0};
+
+function puntajeDe(criterios,admisibilidad){
+  let p=0;
+  (criterios||[]).forEach(c=>{p+=(PESOS[c.id]||0)*(VALOR[c.estado]||0);});
+  /* lo que sube el estándar suma hasta 8 puntos, no resta nunca */
+  const mej=(admisibilidad||[]).filter(a=>a.nivel==="mejora"&&a.estado!=="ausente").length;
+  return Math.min(100,Math.round(p+mej*2));
+}
+const NIVELES=[
+ {min:80,clave:"listo",t:"Lista para la mesa",c:"#1E7A4B",c2:"#4FB07B",bg:"#E6F4EC",
+  d:"Ya tiene todo lo que la mesa necesita para decidir."},
+ {min:60,clave:"casi",t:"Casi lista",c:"#B07A00",c2:"#E8B33D",bg:"#FDF4DD",
+  d:"Le falta poco. Resuelve lo que queda y la llevas."},
+ {min:35,clave:"construccion",t:"En construcción",c:"#C24A00",c2:"#FFA366",bg:"#FFF0E5",
+  d:"Ya hay una idea con forma. Faltan las piezas que la mesa va a pedir."},
+ {min:0,clave:"cruda",t:"Todavía es una idea",c:"#B3261E",c2:"#E57A72",bg:"#FBE9E7",
+  d:"Está en su etapa más temprana. Abajo te digo qué hace falta para que crezca."}
+];
+function nivelDe(p){return NIVELES.find(n=>p>=n.min)||NIVELES[3];}
+/* El ciclo manda sobre la calificación: una priorizada ya no se juzga por su puntaje */
+const CICLOS=[
+ {k:"Borrador",c:"var(--muted)",bg:"var(--paper)",d:"Todavía la estás trabajando"},
+ {k:"En la mesa",c:"#5601D9",c2:"#9B6BFF",bg:"#EEE3FF",d:"Ya la llevaste a priorización"},
+ {k:"Priorizada",c:"#166C43",c2:"#3E9E6E",bg:"#E1F1E8",d:"La mesa la aprobó y entra al backlog"},
+ {k:"Descartada",c:"#5C6370",c2:"#9B9CA9",bg:"#EEEFF3",d:"La mesa decidió no hacerla"}
+];
+function cicloDe(e){return CICLOS.find(c=>c.k===(e.ciclo||"Borrador"))||CICLOS[0];}
+function estadoDe(e){
+  const cy=e.ciclo||"Borrador";
+  if(cy==="Priorizada"||cy==="Descartada"||cy==="En la mesa"){
+    const c=cicloDe(e);return{t:c.k,c:c.c,c2:c.c2||c.c,bg:c.bg,d:c.d,clave:cy.toLowerCase().replace(/ /g,"")};
+  }
+  if(typeof e.puntaje!=="number")return{t:"Sin terminar",c:"var(--faint)",c2:"#C9CAD4",bg:"var(--paper)",d:"Quedó a medias. Ábrela para retomarla.",clave:"amedias"};
+  const n=nivelDe(e.puntaje);return{t:n.t,c:n.c,c2:n.c2,bg:n.bg,d:n.d,clave:n.clave};
+}
+const FILTROS=[
+ {k:"todas",t:"Todas"},
+ {k:"listo",t:"Listas para la mesa"},
+ {k:"casi",t:"Casi listas"},
+ {k:"construccion",t:"En construcción"},
+ {k:"cruda",t:"Todavía son ideas"},
+ {k:"enlamesa",t:"En la mesa"},
+ {k:"priorizada",t:"Priorizadas"},
+ {k:"descartada",t:"Descartadas"}
+];
+
+/* ---- Prioridad estimada, con la lógica RICE de Intercom ----
+   (Alcance × Impacto × Confianza) ÷ Esfuerzo.
+   El agente NO inventa los números: detecta lo que puede y el PM confirma.
+   La confianza sí la pone el agente, porque es justo lo que sabe medir. */
+function num(s){return parseFloat(String(s).replace(/\./g,"").replace(",","."));}
+
+function sugerirAlcance(t){
+  const m=t.match(/(\d{1,3})\s*%\s*(de\s*)?(los\s*)?(MAU|usuarios activos|usuarios|clientes)/i);
+  return m?Math.min(100,num(m[1])):null;
+}
+function sugerirEsfuerzo(t){
+  const fases=(t.match(/fase \d|fase [a-z]\b|etapa \d/gi)||[]).length;
+  const areas=new Set((t.match(/\bdata\b|legal|seguridad|riesgos|compliance|operaciones|core\b|proveedor/gi)||[]).map(x=>x.toLowerCase())).size;
+  const tec=/no soporta|migraci|motor de reglas|integraci[óo]n con|latencia|deuda t[ée]cnica/i.test(t)?1:0;
+  return Math.max(1,Math.min(5,Math.round(fases*0.5+areas*0.6+tec*1.2)||1));
+}
+function confianzaDe(criterios){
+  const ev=(criterios||[]).find(c=>c.id==="c2");
+  const e=ev?ev.estado:"ausente";
+  if(e==="sustentado")return{valor:80,fuente:"hay análisis con cifra detrás"};
+  if(e==="débil")return{valor:50,fuente:"hay una fuente, pero sin cifra ni periodo"};
+  return{valor:20,fuente:"no hay evidencia declarada"};
+}
+/* Escala de impacto, la misma que usa Intercom */
+const IMPACTOS=[{v:3,t:"Masivo"},{v:2,t:"Alto"},{v:1,t:"Medio"},{v:0.5,t:"Bajo"},{v:0.25,t:"Mínimo"}];
+const ESFUERZOS=[{v:1,t:"Muy bajo"},{v:2,t:"Bajo"},{v:3,t:"Medio"},{v:4,t:"Alto"},{v:5,t:"Muy alto"}];
+
+function prioridadDe(t,criterios){
+  return{alcance:sugerirAlcance(t),impacto:null,
+         confianza:confianzaDe(criterios),esfuerzo:sugerirEsfuerzo(t),
+         sugerido:{alcance:sugerirAlcance(t)!==null,esfuerzo:true}};
+}
+function riceDe(pr){
+  if(!pr||pr.alcance===null||pr.impacto===null)return null;
+  const bruto=(pr.alcance*pr.impacto*(pr.confianza.valor/100))/pr.esfuerzo;
+  return{bruto:Math.round(bruto*10)/10,indice:Math.max(1,Math.round(bruto))};
+}
+function faltaRice(pr){
+  const f=[];
+  if(!pr||pr.alcance===null)f.push("a qué porcentaje de usuarios llega");
+  if(!pr||pr.impacto===null)f.push("qué tanto mueve la métrica");
+  return f;
+}
+function bandaPrioridad(r){
+  if(!r)return{t:"Falta información",c:"var(--faint)"};
+  if(r.indice>=40)return{t:"Alta",c:"#166C43"};
+  if(r.indice>=15)return{t:"Media",c:"var(--morado)"};
+  return{t:"Baja",c:"var(--naranja)"};
+}
+/* Cuadrante: solidez contra prioridad. El peligroso es el de abajo a la derecha. */
+function cuadranteDe(p,r){
+  const alta=r&&r.indice>=15, solida=p>=60;
+  if(!r)return{t:"Sin priorizar todavía",d:"Faltan los números para estimar la prioridad. Complétalos abajo."};
+  if(solida&&alta)return{t:"Lista para priorizar",d:"Está sustentada y los números la respaldan. Esta es la conversación que la mesa quiere tener."};
+  if(!solida&&alta)return{t:"Sustentar antes",d:"Los números prometen, pero la sustentación no acompaña. Es la más peligrosa: se prioriza por entusiasmo."};
+  if(solida&&!alta)return{t:"Bien armada, impacto acotado",d:"Está bien construida, pero mueve poco. Pregunta si vale el espacio que ocupa."};
+  return{t:"Todavía no",d:"Ni la sustentación ni los números la sostienen. No gastes tiempo de mesa en esto aún."};
+}
+
+/* ============================================================ MODELO (opcional) */
+const SYSTEM=`Eres un auditor de iniciativas de producto en Spin. Evalúas qué tan sólida está la sustentación de una iniciativa. NO decides si debe hacerse ni la priorizas.
+Para cada uno de los seis criterios (Alineación, Origen, Impacto medible, Apetito, Dependencias, Repetición) devuelve estado (sustentado, débil o ausente), la FRASE TEXTUAL del documento que lo respalda y una nota de máximo 12 palabras.
+REGLA DURA: sin frase que citar, el criterio no puede quedar sustentado.
+Si faltan problema, usuario u objetivo de negocio, marca no_evaluable.
+Hablas en español neutro y cercano, sin tecnicismos. Eres exigente, no complaciente.
+Respondes SIEMPRE solo con JSON válido, sin markdown.`;
+
+async function evaluarConModelo(txt,key){
+  const r=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1400,system:SYSTEM,
+      messages:[{role:"user",content:`Evalúa esta iniciativa. JSON:
+{"no_evaluable":bool,"minimos_faltantes":[],"criterios":[{"id":"c1","nombre":"Alineación","estado":"","cita":"","nota":""}],"preguntas":[{"id":"p1","criterio":"c3","origen":"generada","texto":""}],"dependencias":[{"tipo":"","iniciativa":"","squad":"","nota":""}],"cobertura":""}
+Entre 3 y 5 preguntas, solo para criterios débiles o ausentes.
+INICIATIVAS DECLARADAS:
+${corpusActual().map(i=>i.id+" | "+i.squad+" | "+i.nombre+" | "+i.objetivo).join("\n")}
+DOCUMENTO:
+${txt}`}]})});
+  if(!r.ok)throw new Error("sin respuesta");
+  const d=await r.json();
+  const t=d.content.filter(b=>b.type==="text").map(b=>b.text).join("");
+  const c=t.replace(/```json|```/g,"").trim();
+  return JSON.parse(c.slice(c.indexOf("{"),c.lastIndexOf("}")+1));
+}
+
+/* ============================================================ ESTADO */
+const LLAVE="arbitro.spin.datos.v1";
+const Disco={ok:true,
+  leer(){try{const r=localStorage.getItem(LLAVE);return r?JSON.parse(r):null;}catch(e){Disco.ok=false;return null;}},
+  escribir(d){try{localStorage.setItem(LLAVE,JSON.stringify(d));return true;}catch(e){Disco.ok=false;return false;}},
+  borrar(){try{localStorage.removeItem(LLAVE);}catch(e){}}
+};
+let S={verLista:false,verLey:false,sq:"",podio:null,arrastrando:null,busca:"",vsq:"todas",viendo:null,docHtml:"",vista:"inicio",doc:"",exp:null,key:"",expedientes:[],corpus:[],corpusEjemplo:false,orden:"fecha",filtro:"todas",
+       meta:{iniciativa:"",squad:"",autor:""},aviso:"",fase:"",comparando:null,editando:null};
+function corpusActual(){return S.corpus||[];}
+function persistir(){
+  const ok=Disco.escribir({v:1,expedientes:S.expedientes,corpus:S.corpus,corpusEjemplo:S.corpusEjemplo,meta:S.meta,podio:S.podio});
+  if(!ok&&!S.aviso)S.aviso="No pude guardar este expediente en el equipo. Descárgalo si quieres conservarlo.";
+}
+function restaurar(){
+  const d=Disco.leer();
+  if(d){S.expedientes=d.expedientes||[];S.corpus=d.corpus||[];S.corpusEjemplo=!!d.corpusEjemplo;S.meta=d.meta||S.meta;S.podio=d.podio||null;}
+}
+function norm(s){return (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9 ]/g,"").trim();}
+function nombreExp(meta,fecha,version){
+  return [meta.squad||"Sin squad",meta.iniciativa||"Iniciativa sin nombre",fecha,"v"+version].join(" · ");
+}
+/* saca nombre de iniciativa, squad y autor del propio documento */
+function leerMeta(txt){
+  const m={iniciativa:"",squad:"",autor:""};
+  const l=txt.split(/\n/).map(s=>s.trim()).filter(Boolean);
+  const bus=(re)=>{const f=l.find(s=>re.test(s));return f?f.replace(re,"").trim():"";};
+  m.iniciativa=bus(/^(iniciativa|proyecto|feature|t[íi]tulo)\s*:/i);
+  m.squad=bus(/^(squad|equipo|c[ée]lula|team)\s*:/i);
+  m.autor=bus(/^(autor|pm|responsable|owner)\s*:/i);
+  if(!m.iniciativa&&l.length)m.iniciativa=l[0].replace(/^#+\s*/,"").slice(0,70);
+  return m;
+}
+function versionDe(iniciativa){
+  const prev=S.expedientes.filter(e=>norm(e.iniciativa)===norm(iniciativa));
+  return prev.length?Math.max(...prev.map(e=>e.version||1))+1:1;
+}
+
+function expEjemplo(id,nombre,iniciativa,version,fecha,prd,extra){
+  const e=evaluarLocal(prd,[]);
+  const sem=semaforoDe(e.criterios,e.noEvaluable);
+  const puntaje=puntajeDe(e.criterios,e.admisibilidad);
+  const prioridad=prioridadDe(prd,e.criterios);
+  return Object.assign({id,nombre,iniciativa,version,fecha,prd,ejemplo:true,
+    squad:(nombre.split(" · ")[0]||""),autor:"PM del squad",ciclo:"Borrador",ejemplos:{},hilo:[],
+    admisibilidad:e.admisibilidad,minimos:e.minimos,noEvaluable:e.noEvaluable,
+    criterios:e.criterios,dependencias:e.dependencias,cobertura:e.cobertura,
+    preguntas:preguntasDe(e.criterios),cambios:[],votos:{},semaforo:sem,puntaje,prioridad,
+    lectura:lecturaDe(e.criterios,sem),cerrado:true},extra||{});
+}
+function cargarEjemplos(){
+  S.corpus=CORPUS_EJEMPLO.slice();S.corpusEjemplo=true;
+  S.expedientes=[
+    expEjemplo("e1","Card Experience · Alertas de consumo · 2026-09-08 · v1","Alertas de consumo",1,"2026-09-08",PRD_V1),
+    expEjemplo("e2","Card Experience · Alertas de consumo · 2026-09-12 · v2","Alertas de consumo",2,"2026-09-12",PRD_V2),
+    expEjemplo("e3","Money Movement · Límites dinámicos · 2026-09-03 · v1","Límites dinámicos",1,"2026-09-03",PRD_MM,
+      {votos:{c2:{v:"no",motivo:"El volumen está en el tablero de Operaciones, no hace falta repetirlo aquí."}}})
+  ].concat(S.expedientes);
+  persistir();render();
+}
+function borrarTodo(){
+  if(!confirm("Se borran los expedientes y las iniciativas guardadas en este equipo. ¿Seguro?"))return;
+  S.expedientes=[];S.corpus=[];S.corpusEjemplo=false;S.exp=null;Disco.borrar();ir("inicio");
+}
+
+const $=s=>document.querySelector(s);
+const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function ir(v){if(v==="chat"&&!S.exp)return;S.vista=v;S.aviso="";render();}
+function set(o){Object.assign(S,o);render();}
+
+/* ============================================================ ILUSTRACIONES
+   Volumen suave, caucho mate: degradado radial descentrado, sombra difusa,
+   luz ancha de poca opacidad y cero brillos duros.
+   ============================================================ */
+function clayDefs(k){return `<defs>
+  <radialGradient id="${k}m" cx="34%" cy="24%" r="82%">
+    <stop offset="0%" stop-color="#A77BFF"/><stop offset="52%" stop-color="#6C21E8"/><stop offset="100%" stop-color="#43009E"/></radialGradient>
+  <radialGradient id="${k}n" cx="34%" cy="24%" r="82%">
+    <stop offset="0%" stop-color="#FFC08F"/><stop offset="52%" stop-color="#FC7A2E"/><stop offset="100%" stop-color="#D14A00"/></radialGradient>
+  <radialGradient id="${k}c" cx="34%" cy="22%" r="84%">
+    <stop offset="0%" stop-color="#7FE4F2"/><stop offset="55%" stop-color="#16BBD4"/><stop offset="100%" stop-color="#0A8CA3"/></radialGradient>
+  <radialGradient id="${k}l" cx="30%" cy="20%" r="86%">
+    <stop offset="0%" stop-color="#FFFFFF"/><stop offset="58%" stop-color="#F1E8FF"/><stop offset="100%" stop-color="#D8C6F7"/></radialGradient>
+  <filter id="${k}s" x="-45%" y="-45%" width="190%" height="190%">
+    <feDropShadow dx="0" dy="7" stdDeviation="8" flood-color="#2B0A63" flood-opacity="0.16"/></filter>
+  <filter id="${k}ss" x="-45%" y="-45%" width="190%" height="190%">
+    <feDropShadow dx="0" dy="3" stdDeviation="3.5" flood-color="#2B0A63" flood-opacity="0.18"/></filter>
+  <filter id="${k}blur"><feGaussianBlur stdDeviation="5"/></filter>
+</defs>`;}
+const luz=(k,cx,cy,rx,ry,op,rot)=>`<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" opacity="${op||.3}" filter="url(#${k}blur)"${rot?` transform="rotate(${rot} ${cx} ${cy})"`:""}/>`;
+
+const ILUS={
+ /* Portada: el documento en revisión */
+ hero(){const k="h1";return `<svg viewBox="0 0 300 250" width="260" height="216" role="img" aria-label="Documento en revisión">
+  ${clayDefs(k)}
+  <ellipse cx="152" cy="232" rx="96" ry="12" fill="#5601D9" opacity=".13" filter="url(#${k}blur)"/>
+  <g transform="rotate(-7 120 120)">
+    <rect x="52" y="34" width="132" height="168" rx="26" fill="url(#${k}l)" filter="url(#${k}s)"/>
+    ${luz(k,92,66,30,16,.5,-20)}
+    <rect x="76" y="66" width="62" height="11" rx="5.5" fill="url(#${k}m)" opacity=".85"/>
+    <rect x="76" y="90" width="86" height="9" rx="4.5" fill="#C9B3F2" opacity=".75"/>
+    <rect x="76" y="108" width="70" height="9" rx="4.5" fill="#C9B3F2" opacity=".75"/>
+    <rect x="76" y="132" width="34" height="9" rx="4.5" fill="url(#${k}n)"/>
+    <rect x="118" y="132" width="44" height="9" rx="4.5" fill="#C9B3F2" opacity=".75"/>
+    <rect x="76" y="150" width="80" height="9" rx="4.5" fill="#C9B3F2" opacity=".75"/>
+    <rect x="76" y="168" width="52" height="9" rx="4.5" fill="#C9B3F2" opacity=".75"/>
+  </g>
+  <g filter="url(#${k}s)">
+    <circle cx="206" cy="160" r="46" fill="url(#${k}m)"/>
+    ${luz(k,190,140,22,13,.34,-25)}
+    <path d="M206 128a32 32 0 1 1-31.6 36.4" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" opacity=".92"/>
+    <circle cx="206" cy="160" r="9" fill="url(#${k}n)"/>
+  </g>
+  <g filter="url(#${k}ss)">
+    <circle cx="56" cy="196" r="18" fill="url(#${k}n)"/>
+    ${luz(k,50,189,8,5,.4,-25)}
+  </g>
+ </svg>`;},
+
+ /* Los tres pasos */
+ leer(){const k="i1";return `<svg viewBox="0 0 64 64" width="46" height="46" aria-hidden="true">${clayDefs(k)}
+  <rect x="10" y="7" width="36" height="46" rx="11" fill="url(#${k}l)" filter="url(#${k}ss)"/>
+  ${luz(k,20,16,9,5,.55,-20)}
+  <rect x="18" y="18" width="18" height="4" rx="2" fill="url(#${k}m)" opacity=".8"/>
+  <rect x="18" y="27" width="22" height="3.5" rx="1.75" fill="#C9B3F2"/>
+  <rect x="18" y="35" width="14" height="3.5" rx="1.75" fill="#C9B3F2"/>
+  <g filter="url(#${k}ss)"><circle cx="43" cy="41" r="14" fill="url(#${k}m)"/>
+   ${luz(k,38,35,6,4,.35,-25)}
+   <circle cx="43" cy="41" r="6.5" fill="#fff" opacity=".9"/>
+   <rect x="50" y="48" width="10" height="5.5" rx="2.75" fill="url(#${k}m)" transform="rotate(42 50 48)"/></g>
+ </svg>`;},
+ preguntar(){const k="i2";return `<svg viewBox="0 0 64 64" width="46" height="46" aria-hidden="true">${clayDefs(k)}
+  <g filter="url(#${k}ss)"><path d="M12 10h40a9 9 0 0 1 9 9v18a9 9 0 0 1-9 9H32l-12 9v-9h-8a9 9 0 0 1-9-9V19a9 9 0 0 1 9-9Z" fill="url(#${k}m)"/>
+  ${luz(k,24,20,12,6,.3,-18)}
+  <path d="M27 24a6 6 0 1 1 8 5.6v3.4" stroke="#fff" stroke-width="4.5" stroke-linecap="round" fill="none" opacity=".95"/>
+  <circle cx="35" cy="39" r="2.8" fill="#fff" opacity=".95"/></g>
+  <g filter="url(#${k}ss)"><circle cx="54" cy="52" r="8" fill="url(#${k}n)"/>${luz(k,51,49,3.5,2.2,.4)}</g>
+ </svg>`;},
+ acta(){const k="i3";return `<svg viewBox="0 0 64 64" width="46" height="46" aria-hidden="true">${clayDefs(k)}
+  <rect x="11" y="8" width="38" height="44" rx="11" fill="url(#${k}l)" filter="url(#${k}ss)"/>
+  ${luz(k,21,17,9,5,.55,-20)}
+  <rect x="19" y="19" width="20" height="3.5" rx="1.75" fill="#C9B3F2"/>
+  <rect x="19" y="27" width="14" height="3.5" rx="1.75" fill="#C9B3F2"/>
+  <g filter="url(#${k}ss)"><circle cx="43" cy="42" r="15" fill="url(#${k}n)"/>
+   ${luz(k,37,36,6,4,.35,-25)}
+   <path d="M36 42.5l5 5 10-10.5" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></g>
+ </svg>`;},
+
+ /* Estados vacíos */
+ iniciativas(){const k="v1";return `<svg viewBox="0 0 150 120" width="150" height="120" aria-hidden="true">${clayDefs(k)}
+  <ellipse cx="75" cy="108" rx="52" ry="8" fill="#5601D9" opacity=".12" filter="url(#${k}blur)"/>
+  <g filter="url(#${k}ss)"><rect x="26" y="20" width="98" height="26" rx="12" fill="url(#${k}l)"/>${luz(k,45,28,14,5,.5,-12)}
+   <rect x="38" y="30" width="34" height="6" rx="3" fill="#C9B3F2"/><circle cx="110" cy="33" r="5" fill="url(#${k}n)" opacity=".7"/></g>
+  <g filter="url(#${k}ss)"><rect x="20" y="52" width="110" height="26" rx="12" fill="url(#${k}m)"/>${luz(k,42,60,16,5,.28,-12)}
+   <rect x="34" y="62" width="40" height="6" rx="3" fill="#fff" opacity=".85"/><circle cx="112" cy="65" r="5" fill="url(#${k}n)"/></g>
+  <g filter="url(#${k}ss)"><rect x="30" y="84" width="90" height="22" rx="11" fill="url(#${k}l)"/>${luz(k,48,90,12,4,.5,-12)}
+   <rect x="42" y="92" width="30" height="6" rx="3" fill="#C9B3F2"/></g>
+ </svg>`;},
+ expedientes(){const k="v2";return `<svg viewBox="0 0 150 120" width="150" height="120" aria-hidden="true">${clayDefs(k)}
+  <ellipse cx="75" cy="109" rx="50" ry="8" fill="#5601D9" opacity=".12" filter="url(#${k}blur)"/>
+  <g filter="url(#${k}ss)" transform="rotate(-8 75 60)"><rect x="40" y="18" width="70" height="60" rx="14" fill="url(#${k}l)"/>${luz(k,56,30,14,6,.5,-18)}</g>
+  <g filter="url(#${k}s)"><path d="M28 44a12 12 0 0 1 12-12h20l8 9h34a12 12 0 0 1 12 12v39a12 12 0 0 1-12 12H40a12 12 0 0 1-12-12V44Z" fill="url(#${k}m)"/>
+   ${luz(k,50,54,18,7,.26,-14)}</g>
+  <g filter="url(#${k}ss)"><circle cx="112" cy="40" r="13" fill="url(#${k}n)"/>${luz(k,107,35,5,3.2,.38)}
+   <path d="M106 40.5l4 4 8-8.5" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></g>
+ </svg>`;},
+
+ /* Avatar del agente */
+ avatar(){const k="a1";return `<svg viewBox="0 0 40 40" aria-hidden="true">${clayDefs(k)}
+  <circle cx="20" cy="20" r="18" fill="url(#${k}m)"/>
+  ${luz(k,14,12,8,5,.3,-25)}
+  <path d="M20 8.5a11.5 11.5 0 1 1-11.4 13" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" opacity=".95"/>
+  <circle cx="20" cy="20" r="3.4" fill="url(#${k}n)"/>
+ </svg>`;}
+};
+
+/* ============================================================ VISTAS */
+function vInicio(){
+  return `<div class="hero">
+    <div>
+      <span class="kicker">Desde la idea hasta la mesa <b>·</b> Spin</span>
+      <h1>Trae tu idea como esté y te digo qué le falta</h1>
+      <p>No hace falta que sea un PRD terminado. Escribe tu iniciativa como la contarías en voz alta,
+      aunque esté a medias, y te digo qué tiene, qué le falta y qué preguntas responder para
+      completarla. La vara sale de los PRD reales de Spin. No decido si se hace ni en qué orden:
+      eso sigue siendo de la mesa. Lo que hago es ayudarte a que llegue completa.</p>
+    </div>
+    <div class="heroArt">${ILUS.hero()}</div>
+  </div>
+  <div class="comofunciona">
+    <div class="cf-h"><b>Cómo funciona</b><span>Tres pasos, menos de diez minutos</span></div>
+    <div class="pasos">
+      <div class="paso">${ILUS.leer()}<i>Paso 1 · Lectura</i><b>Leo tu documento</b><span>Reviso los quince puntos que Spin necesita ver en una iniciativa y te digo cuáles ya tienes, cuáles están a medias y cuáles faltan.</span></div>
+      <div class="paso">${ILUS.preguntar()}<i>Paso 2 · Preguntas</i><b>Te pregunto lo que preguntará la mesa</b><span>Las preguntas clave para completar lo que falta. Respóndelas y tu iniciativa crece con ellas.</span></div>
+      <div class="paso">${ILUS.acta()}<i>Paso 3 · Informe</i><b>Te entrego el informe</b><span>Calificación final, prioridad estimada y una página lista para llevar a la mesa, o para seguir trabajando.</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="meta3">
+      <label>Iniciativa<input value="${esc(S.meta.iniciativa)}" placeholder="Se toma del documento si no la escribes" oninput="S.meta.iniciativa=this.value"></label>
+      <label>Squad<input value="${esc(S.meta.squad)}" placeholder="Card Experience" oninput="S.meta.squad=this.value"></label>
+      <label>Responsable<input value="${esc(S.meta.autor)}" placeholder="Tu nombre" oninput="S.meta.autor=this.value"></label>
+    </div>
+    <label for="txt" style="font-weight:600;font-size:13.5px;display:block;margin:16px 0 8px">
+      Cuenta tu iniciativa. Como la tengas: una idea suelta, media página o un PRD completo</label>
+    <textarea id="txt" rows="8" placeholder="Qué problema viste, a quién le pasa, qué se te ocurrió hacer… lo que tengas por ahora"
+      oninput="S.doc=this.value">${esc(S.doc)}</textarea>
+
+    <div class="drop" id="drop">
+      También puedes <label style="color:var(--accent);font-weight:600;cursor:pointer;text-decoration:underline">
+      subir un archivo<input type="file" accept=".docx,.pdf,.txt,.md" style="display:none" onchange="leerArchivo(this.files[0])"></label>
+      o arrastrarlo aquí. Word, PDF o texto.
+      <div id="estadoArchivo" style="font-size:12.5px;color:var(--faint);margin-top:6px"></div>
+    </div>
+
+    <div style="display:flex;gap:12px;align-items:center;margin-top:14px;flex-wrap:wrap">
+      <button class="btn" onclick="empezar()">Evaluar iniciativa</button>
+      <button class="btn link" onclick="S.doc=PRD_V1;S.meta={iniciativa:'Alertas de consumo en tiempo real',squad:'Card Experience',autor:''};render()">Usar un PRD de ejemplo</button>
+      
+    </div>
+
+    <div id="avanzado" style="display:none;margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+      <label style="font-size:12px;font-weight:600;color:var(--muted)">Clave de acceso
+        <input type="password" value="${S.key}" oninput="S.key=this.value" style="margin-top:6px"></label>
+    </div>
+  </div>`;
+}
+
+function semHTML(sem,lectura,grande){
+  const s=SEM[sem]||SEM.amarillo;
+  const ic={verde:'<path d="M4 12.5l5 5L20 6.5" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+            amarillo:'<path d="M12 5v9" stroke="#fff" stroke-width="2.8" stroke-linecap="round"/><circle cx="12" cy="18.5" r="1.7" fill="#fff"/>',
+            rojo:'<path d="M6 12h12" stroke="#fff" stroke-width="2.8" stroke-linecap="round"/>'}[sem]||"";
+  return `<div class="sem" style="background:${s.bg}">
+    <div class="luz" style="background:${s.c}"><svg viewBox="0 0 24 24">${ic}</svg></div>
+    <div><b style="color:${s.c}">${s.t}</b>
+    <span style="font-size:${grande?14.5:13}px;color:#4A4B58">${esc(lectura||s.d)}</span>
+    ${grande?'<small>Esto mide qué tan sólida está la sustentación, no qué tan prioritaria es la iniciativa.</small>':''}</div>
+  </div>`;
+}
+
+function critHTML(c,i){
+  const pct={sustentado:100,"débil":55,ausente:12}[c.estado];
+  const col={sustentado:"var(--morado)","débil":"var(--naranja)",ausente:"var(--grisOsc)"}[c.estado];
+  const v=S.exp.votos[c.id];
+  return `<div class="crit">
+    <div class="top"><strong>${c.nombre}</strong><span class="chip s-${c.estado==="débil"?"debil":c.estado}">${c.estado}</span></div>
+    <div class="barra"><i style="width:${pct}%;background:${col}"></i></div>
+    ${c.cita?`<div class="cita">“${esc(c.cita)}”</div>`:''}
+    <div class="nota">${esc(c.nota)}</div>
+    ${v?`<div class="marca2 ${v.v}">${v.v==="ok"?"Estás de acuerdo con esta lectura.":"No estás de acuerdo: "+esc(v.motivo)}
+        <button class="btn link" style="margin-left:8px;font-size:12px" onclick="votar('${c.id}',null)">cambiar</button></div>`
+      :`<div class="voto">
+        <button onclick="votar('${c.id}','ok')">De acuerdo</button>
+        <button onclick="votar('${c.id}','no')">No estoy de acuerdo</button>
+        ${c.estado!=="sustentado"?`<button onclick="verEjemplo('${c.id}')">¿Cómo se ve bien?</button>`:""}</div>`}
+    ${S.exp.ejemplos&&S.exp.ejemplos[c.id]?`<div class="ejemplo">
+      <div class="et">Ejemplo genérico · no está escrito para tu iniciativa</div>
+      ${esc(EJEMPLO[c.id])}
+      <div class="pie">No te lo redacto: si yo escribo tu PRD, dejo de poder auditarlo. Esto es el nivel de concreción que hace falta.</div></div>`:""}
+  </div>`;
+}
+
+function vChat(){
+  const e=S.exp;
+  const msg=(txt,extra)=>`<div class="msg"><div class="av">${ILUS.avatar()}</div><div class="burb">${txt}${extra||""}</div></div>`;
+
+  if(S.fase==="leyendo"||!e.criterios){
+    return `<div class="split"><div class="thread">
+      ${msg('<h3>Leyendo tu documento</h3><div class="typing"><span></span><span></span><span></span></div><p style="margin-top:10px;color:var(--muted)">Estoy buscando las catorce cosas que un PRD necesita tener, y las frases tuyas en las que me pueda apoyar.</p>')}
+    </div>${docHTML()}</div>`;
+  }
+  const paso=e.paso||"lectura";
+  if(paso==="preguntas")return vPreguntas(e,msg);
+  if(paso==="informe")return vInforme(e,msg);
+  return vLectura(e,msg);
+}
+
+/* ---------- El proceso, siempre visible ---------- */
+function stepper(){
+  const p=S.exp.paso||"lectura";
+  const orden=["lectura","preguntas","informe"];
+  const idx=orden.indexOf(p);
+  const P=[["lectura","Lectura","Qué tienes y qué falta"],
+           ["preguntas","Preguntas","Lo que falta por definir"],
+           ["informe","Informe","Calificación y prioridad"]];
+  return `<div class="proceso">
+    <button class="volver" onclick="ir('exp')">← Tablero</button>
+    <div class="pasos3">
+      ${P.map(([k,t,d],n)=>{
+        const est=n<idx?"hecho":n===idx?"activo":"pendiente";
+        const clic=n<=idx?`onclick="irPaso('${k}')"`:"";
+        return `${n?'<span class="ln '+(n<=idx?"on":"")+'"></span>':""}
+        <button class="p3 ${est}" ${clic} ${n>idx?"disabled":""}>
+          <i>${est==="hecho"?"✓":n+1}</i><div><b>${t}</b><span>${d}</span></div></button>`;}).join("")}
+    </div>
+  </div>`;
+}
+
+/* ---------- Momento 1: la lectura ---------- */
+function vLectura(e,msg){
+  const cuenta=n=>({d:(e.admisibilidad||[]).filter(a=>(a.nivel||"esencial")===n&&a.estado==="declarado").length,
+                    i:(e.admisibilidad||[]).filter(a=>(a.nivel||"esencial")===n&&a.estado==="insinuado").length,
+                    f:(e.admisibilidad||[]).filter(a=>(a.nivel||"esencial")===n&&a.estado==="ausente").length,
+                    t:(e.admisibilidad||[]).filter(a=>(a.nivel||"esencial")===n).length});
+  const ce=cuenta("esencial");
+
+  let out="";
+
+  /* 1. la calificación, lo primero */
+  out+=`<div class="bloqueA">${veredictoHTML(e,true)}</div>`;
+
+  if((e.avisos||[]).length)
+    out+=`<div class="avisos">${e.avisos.map(a=>`<div>${esc(a)}</div>`).join("")}</div>`;
+
+  if(e.noEvaluable){
+    out+=`<section class="tarjeta"><h3>Necesito un poco más para poder ayudarte</h3>
+      <p class="sub">Con esto no alcanzo a orientarte todavía. Cuéntame al menos:</p>
+      <ul class="lista">${e.minimos.map(m=>`<li>${m}</li>`).join("")}</ul></section>`;
+    return `${stepper()}<div class="split"><div class="flujo">${out}</div>${docHTML()}</div>`;
+  }
+
+  /* 2. inventario del documento, compacto */
+  out+=`<section class="tarjeta">
+    <div class="th">
+      <h3>Qué tiene tu iniciativa hasta ahora</h3>
+      <div class="resumen">
+        <span class="mini-chip s-declarado">${ce.d} claros</span>
+        <span class="mini-chip s-insinuado">${ce.i} a medias</span>
+        <span class="mini-chip s-ausente">${ce.f} sin escribir</span>
+      </div>
+    </div>
+    <p class="leyendita">
+      <b>Claro</b>: está escrito y con detalle suficiente. ·
+      <b>A medias</b>: se menciona de pasada, sin desarrollar. ·
+      <b>Sin escribir</b>: no lo encontré en el documento.
+    </p>
+    <button class="btn link mini" onclick="S.verLista=!S.verLista;render()">
+      ${S.verLista?"Ocultar el detalle":"Ver los "+(e.admisibilidad||[]).length+" puntos uno por uno"}</button>
+    ${S.verLista?`<div class="cols">
+      ${nivelHTML(e,"esencial","Lo que un PRD de Spin tiene que traer","")}
+      ${nivelHTML(e,"mejora","Lo que subiría el estándar","No es práctica habitual en Spin todavía. Si falta, lo anoto, pero no baja la calificación.")}
+    </div>`:""}
+  </section>`;
+
+  /* 3. los seis criterios */
+  out+=`<section class="tarjeta">
+    <div class="th"><h3>Cómo quedó cada criterio</h3></div>
+    <p class="sub">Cada juicio va con la frase tuya en la que me apoyé. Si no encuentro una frase, el criterio no puede quedar sustentado.</p>
+    <div class="crits">${e.criterios.map(critHTML).join("")}</div>
+  </section>`;
+
+  /* 4. ¿alguien más está en esto? */
+  const hayCruce=e.dependencias.length>0;
+  const sinDatos=!hayCruce&&corpusActual().length===0&&S.expedientes.filter(x=>x.criterios&&x.id!==e.id).length===0;
+  out+=`<section class="similar ${hayCruce?"si":sinDatos?"nd":"no"}">
+    <i>${hayCruce?"!":sinDatos?"?":"✓"}</i>
+    <div>
+      <b>${hayCruce?"Hay alguien más en algo parecido":sinDatos?"Todavía no puedo decirte si alguien más está en esto":"Nadie más está en algo parecido"}</b>
+      ${hayCruce?e.dependencias.map(d=>`<p><strong>${esc(d.iniciativa)}</strong> <span class="sq">${d.squad}${d.evaluada?" · ya evaluada":""}</span> — ${esc(d.nota)}</p>`).join("")
+        :sinDatos?`<p>No tengo con qué comparar todavía. Carga lo que hace cada squad, o pasa más iniciativas por aquí: cada una que evalúes mejora esta detección.</p>`
+                :`<p>Comparé contra todo lo que hay cargado y contra las iniciativas que ya pasaron por aquí. Ninguna resuelve lo mismo.</p>`}
+      ${sinDatos?"":`<em>${esc(e.cobertura||"")}</em>`}
+      ${corpusActual().length?"":`<button class="btn sec mini" onclick="ir('ini')">Cargar las iniciativas de los squads</button>`}
+    </div>
+  </section>`;
+
+  /* 5. el paso siguiente */
+  const n=(e.preguntas||[]).length;
+  out+=`<button class="avanzar" onclick="irPaso('${n?"preguntas":"informe"}')">
+    <div><span>Paso 2 de 3</span><b>${n?"Responder las "+n+" preguntas":"Ver el informe"}</b>
+    <em>${n?"Son las que te faltan para completar la iniciativa. Toma menos de cinco minutos.":"No tengo preguntas para este documento."}</em></div>
+    <i>→</i></button>`;
+
+  return `${stepper()}<div class="split"><div class="flujo">${out}</div>${docHTML()}</div>`;
+}
+
+function cajaPreguntar(){
+  return `<div class="pregunta">
+    <label for="qbox">Ahora pregúntame tú</label>
+    <p class="sub">Antes de entregar: si algo de lo que te marqué no te cuadra, dímelo y te explico de dónde salió.</p>
+    <div class="fila">
+      <input id="qbox" type="text" placeholder="Por ejemplo: ¿por qué dices que mi impacto medible está débil?"
+        onkeydown="if(event.key==='Enter')preguntar()">
+      <button class="btn" onclick="preguntar()">Preguntar</button>
+    </div>
+    <div class="sug">
+      <button class="btn link" onclick="preguntarEso('¿Por qué marcaste así impacto medible?')">¿Por qué impacto medible?</button>
+      <button class="btn link" onclick="preguntarEso('¿Qué significa el semáforo?')">¿Qué significa el semáforo?</button>
+      <button class="btn link" onclick="preguntarEso('¿Me ayudas a escribirlo?')">¿Me ayudas a escribirlo?</button>
+    </div></div>`;
+}
+function hiloHTML(e,msg){
+  let h="";
+  (e.hilo||[]).forEach(m=>{
+    h+= m.rol==="pm" ? `<div class="msg yo"><div class="burb">${esc(m.texto)}</div></div>` : msg(`<p>${esc(m.texto)}</p>`);
+  });
+  return h;
+}
+
+/* ---------- Momento 2: las preguntas ---------- */
+function vPreguntas(e,msg){
+  const P=e.preguntas||[];
+  const i=Math.min(e.qi||0,P.length-1);
+  const p=P[i];
+  const hechas=P.filter(q=>q.nolose||q.respuesta.trim()).length;
+  const listo=hechas===P.length;
+
+  const puntos=P.map((q,x)=>`<button class="pt ${x===i?"on":""} ${q.nolose||q.respuesta.trim()?"ok":""}"
+     onclick="S.exp.qi=${x};render()" aria-label="Pregunta ${x+1}"></button>`).join("");
+
+  const vacios=(e.criterios||[]).filter(c=>c.estado!=="sustentado");
+  const aus=vacios.filter(c=>c.estado==="ausente").map(c=>c.nombre.toLowerCase());
+  const deb=vacios.filter(c=>c.estado==="débil").map(c=>c.nombre.toLowerCase());
+  const porque=`<div class="porque">
+    <b>Por qué estas preguntas y no otras</b>
+    <p>Salen de los vacíos que encontré en tu iniciativa. Primero pregunto por lo que no está escrito,
+    después por lo que está a medias.</p>
+    <div class="vch">
+      ${aus.length?`<span class="vc f"><i></i>Falta: ${aus.join(", ")}</span>`:""}
+      ${deb.length?`<span class="vc m"><i></i>A medias: ${deb.join(", ")}</span>`:""}
+      ${!aus.length&&!deb.length?`<span class="vc ok"><i></i>No encontré vacíos: estas son de contraste</span>`:""}
+    </div>
+    <p class="met">Cada pregunta retira uno de los cuatro riesgos de producto —valor, usabilidad, factibilidad
+    y viabilidad de negocio—, el marco de Marty Cagan. Debajo de cada una te digo cuál.</p>
+  </div>`;
+
+  const cuerpo=porque+`<div class="focoQ">
+    <div class="cabQ">
+      <span>Pregunta ${i+1} de ${P.length}</span>
+      <div class="puntos">${puntos}</div>
+    </div>
+    <div class="barraP"><i style="width:${hechas/P.length*100}%"></i></div>
+    <h2 class="qtxt">${esc(p.texto)}</h2>
+    <div class="src">${p.origen==="banco"?"Pregunta fija · criterio de "+NOMBRES[p.criterio].toLowerCase():p.origen==="usabilidad"?"Pregunta fija · riesgo de usabilidad":"Sale de lo que escribiste"} · retira el riesgo de ${RIESGO[p.criterio]||"valor"}</div>
+    <textarea rows="5" ${p.nolose?"disabled":""} placeholder="${p.nolose?"Quedó registrado que no lo sabes":"Tu respuesta. Mientras más concreta, más se mueve."}"
+      oninput="S.exp.preguntas[${i}].respuesta=this.value;marcarPunto(${i})">${esc(p.respuesta)}</textarea>
+    <div class="accQ">
+      <button class="btn link" onclick="nolose(${i})">${p.nolose?"Quiero responderla":"No lo sé"}</button>
+      <div class="nav">
+        ${i>0?`<button class="btn sec" onclick="S.exp.qi=${i-1};render()">Anterior</button>`:""}
+        ${i<P.length-1?`<button class="btn" onclick="S.exp.qi=${i+1};render()">Siguiente</button>`:""}
+      </div>
+    </div>
+  </div>
+  ${hiloHTML(e,msg)}
+  ${cajaPreguntar()}
+  <button class="avanzar ${listo?"":"off"}" ${listo?'onclick="revisar()"':"disabled"}>
+    <div><span>Paso 3 de 3</span><b>${listo?"Entregar para calificar":"Te faltan "+(P.length-hechas)+" de "+P.length}</b>
+    <em>${listo?"Reviso con tus respuestas y te entrego la calificación y el informe.":"Responde todas, o marca las que no sepas. Ninguna se pierde."}</em></div>
+    <i>→</i></button>
+  <div style="margin-top:10px"><button class="btn link mini" onclick="irPaso('lectura')">← Volver a la lectura</button></div>`;
+
+  return `${stepper()}<div class="split"><div class="thread">${cuerpo}</div>${docHTML()}</div>`;
+}
+
+/* ---------- Momento 3: el informe ---------- */
+function vInforme(e,msg){
+  let hilo="";
+  if((e.cambios||[]).length){
+    hilo+=msg(`<h3>Qué pasó con lo que me dijiste</h3>
+      ${e.cambios.map(c=>`<p><strong>${esc(c.criterio)}</strong>: ${c.de===c.a?"sigue en "+c.a:"de "+c.de+" a "+c.a}. ${esc(c.porque)}</p>`).join("")}`);
+  }else if((e.preguntas||[]).length&&!e.ejemplo){
+    hilo+=msg(`<h3>Revisé tus respuestas</h3><p>Ningún criterio cambió de estado.</p>`);
+  }
+  hilo+=`<div class="msg"><div class="av">${ILUS.avatar()}</div><div class="burb" style="padding:0;border:none;background:none;box-shadow:none">${actaHTML(e)}</div></div>`;
+  hilo+=hiloHTML(e,msg);
+  hilo+=`<div style="margin-top:4px"><button class="btn link" onclick="irPaso('lectura')">← Ver de nuevo la lectura y los criterios</button></div>`;
+  return `${stepper()}<div class="split informe"><div class="thread">${hilo}</div>${docHTML()}</div>`;
+}
+
+/* ---------- Veredicto con calificación ---------- */
+function veredictoHTML(e,grande){
+  if(typeof e.puntaje!=="number")return semHTML(e.semaforo,e.lectura,grande);
+  const n=nivelDe(e.puntaje);
+  return `<div class="sem" style="background:linear-gradient(120deg,${n.c}12,${n.c}06)">
+    <div class="marcador" style="border-color:${n.c}">
+      <b style="color:${n.c}">${e.puntaje}</b><span>de 100</span>
+    </div>
+    <div><b style="color:${n.c}">${n.t}</b>
+    <span style="font-size:${grande?14.5:13}px;color:#4A4B58">${esc(e.lectura||n.d)}</span>
+    ${grande?`<small>${n.d} Esta calificación mide qué tan sustentado está el documento, no qué tan prioritaria es la iniciativa.</small>`:''}</div>
+  </div>`;
+}
+
+/* ---------- Ficha de prioridad estimada ---------- */
+function fichaHTML(e){
+  const pr=e.prioridad||prioridadDe(e.prd,e.criterios);
+  const r=riceDe(pr), banda=bandaPrioridad(r), falta=faltaRice(pr);
+  const cu=cuadranteDe(e.puntaje||0,r);
+  return `<div class="ficha">
+    <div class="fh">
+      <div><b>Prioridad estimada</b><span>Método RICE, de Intercom. Los números los pones tú; yo solo pongo la confianza.</span></div>
+      <div class="rice" style="color:${banda.c}">${r?r.indice:"—"}<i>Prioridad ${banda.t.toLowerCase()}</i></div>
+    </div>
+    <div class="campos">
+      <label>Alcance
+        <div class="cx"><input type="number" min="0" max="100" value="${pr.alcance===null?"":pr.alcance}"
+          oninput="setRice('alcance',this.value)"><span>% de usuarios</span></div>
+        <em>${pr.sugerido&&pr.sugerido.alcance?"detectado en tu documento, confírmalo":"no lo encontré en el documento"}</em></label>
+      <label>Impacto
+        <select onchange="setRice('impacto',this.value)">
+          <option value="">Elige</option>
+          ${IMPACTOS.map(i=>`<option value="${i.v}" ${pr.impacto==i.v?"selected":""}>${i.t} (${i.v})</option>`).join("")}
+        </select>
+        <em>cuánto mueve la métrica a quien alcanza</em></label>
+      <label>Confianza
+        <div class="fijo" style="color:var(--morado)">${pr.confianza.valor}%</div>
+        <em>${pr.confianza.fuente}</em></label>
+      <label>Esfuerzo
+        <select onchange="setRice('esfuerzo',this.value)">
+          ${ESFUERZOS.map(i=>`<option value="${i.v}" ${pr.esfuerzo==i.v?"selected":""}>${i.t} (${i.v})</option>`).join("")}
+        </select>
+        <em>sugerido por fases y áreas involucradas</em></label>
+    </div>
+    ${falta.length?`<div class="faltaR">Para estimar la prioridad me falta: ${falta.join(" y ")}.</div>`:""}
+    <div class="cuad"><b>${cu.t}</b><span>${cu.d}</span></div>
+  </div>`;
+}
+function setRice(campo,valor){
+  const pr=S.exp.prioridad=S.exp.prioridad||prioridadDe(S.exp.prd,S.exp.criterios);
+  if(campo==="alcance")pr.alcance=valor===""?null:Math.max(0,Math.min(100,parseFloat(valor)));
+  if(campo==="impacto")pr.impacto=valor===""?null:parseFloat(valor);
+  if(campo==="esfuerzo")pr.esfuerzo=parseFloat(valor);
+  sincronizar();render();
+}
+
+/* ============================================================ MATRIZ Y PODIO */
+/* Valor estimado: alcance ponderado por el impacto que declaró el PM.
+   Esfuerzo: la escala de 1 a 5 de RICE. Tamaño: confianza. Color: calificación. */
+/* Nomenclatura automática: inicial del squad más un número. C1, M2, S3… */
+function codigos(){
+  const L=ultimasTodas().slice().sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
+  const cont={},m={};
+  L.forEach(e=>{
+    const sq=(e.squad||"Iniciativa").trim();
+    const ini=(sq.replace(/[^A-Za-zÁÉÍÓÚÑ]/g,"")[0]||"I").toUpperCase();
+    cont[ini]=(cont[ini]||0)+1;
+    m[e.id]=ini+cont[ini];
+  });
+  return m;
+}
+function coordenadas(e){
+  const pr=e.prioridad;
+  /* sin evaluar: se ubica igual, en la zona neutra, y se marca */
+  if(!pr||!e.criterios)return{valor:6,esfuerzo:50,conf:20,estimado:true,sinEvaluar:true,r:13};
+  /* Si el PM todavía no declaró alcance o impacto, el agente estima con lo que sí sabe
+     y lo marca como estimado. Vale más una posición aproximada y avisada que una matriz vacía. */
+  let estimado=false;
+  let alcance=pr.alcance;
+  if(alcance===null){ alcance=sugerirAlcance(e.prd||""); }
+  if(alcance===null){ alcance=30; estimado=true; }
+  let impacto=pr.impacto;
+  if(impacto===null){
+    const c3=(e.criterios||[]).find(c=>c.id==="c3");
+    impacto=c3&&c3.estado==="sustentado"?2:c3&&c3.estado==="débil"?1:0.5;
+    estimado=true;
+  }
+  const valor=Math.max(3,Math.min(100,Math.round(alcance*impacto/1.5)));
+  const esfuerzo=Math.max(4,Math.min(100,Math.round((pr.esfuerzo-0.5)/5*100)));
+  const conf=pr.confianza.valor;
+  return{valor,esfuerzo,conf,estimado,r:conf>=80?26:conf>=50?20:14};
+}
+const CUADRANTES=[
+ {x:0,y:0,w:50,h:50,t:"Hazlo ya",d:"mucho valor, poco esfuerzo"},
+ {x:50,y:0,w:50,h:50,t:"Vale la pena planearlo",d:"mucho valor, mucho esfuerzo"},
+ {x:0,y:50,w:50,h:50,t:"Si sobra tiempo",d:"poco valor, poco esfuerzo"},
+ {x:50,y:50,w:50,h:50,t:"Mejor no",d:"poco valor, mucho esfuerzo"}
+];
+/* en la matriz y el podio pesa solo la última versión de cada iniciativa */
+function ultimasTodas(){
+  const L=S.expedientes.slice();
+  const m={};
+  L.forEach(e=>{const k=norm(e.iniciativa||e.nombre);
+    if(!m[k]||(e.version||1)>(m[k].version||1))m[k]=e;});
+  return Object.values(m);
+}
+function ultimas(){
+  const L=S.expedientes.filter(e=>e.criterios);
+  const m={};
+  L.forEach(e=>{const k=norm(e.iniciativa||e.nombre);
+    if(!m[k]||(e.version||1)>(m[k].version||1))m[k]=e;});
+  return Object.values(m);
+}
+function matrizHTML(){
+  const L=S.expedientes.length?ultimasTodas():[];
+  const COD=codigos();
+  const con=L.map(e=>({e,c:coordenadas(e)})).filter(o=>o.c);
+  const W=700,H=330,M={l:46,r:18,t:22,b:40};
+  const px=v=>M.l+(v/100)*(W-M.l-M.r);
+  const py=v=>M.t+((100-v)/100)*(H-M.t-M.b);
+  return `<section class="matriz">
+    <div class="th">
+      <h2 class="subt">Dónde cae cada iniciativa</h2>
+      <span class="hint">Toca una burbuja para leerla</span>
+    </div>
+    <div class="mgrid">
+      <div class="minstr">
+        <div class="ins"><div class="ic ejes"><span></span><span></span></div>
+          <div><b>Los dos ejes</b><p>Horizontal, el esfuerzo. Vertical, el valor que promete. Arriba a la izquierda es lo que más conviene.</p></div></div>
+        <div class="ins"><div class="ic tam"><i class="g"></i><i class="p"></i></div>
+          <div><b>El tamaño</b><p>Es la confianza. Burbuja grande, evidencia sólida detrás; pequeña, todavía es un supuesto.</p></div></div>
+        <div class="ins"><div class="ic col">${NIVELES.map(n=>`<i style="background:${n.c}"></i>`).join("")}</div>
+          <div><b>El color</b><p>Es la calificación: ${NIVELES.map(n=>`<span style="color:${n.c}">${n.t.toLowerCase()}</span>`).join(", ")}.</p></div></div>
+        <div class="ins"><div class="ic pun"></div>
+          <div><b>Borde punteado</b><p>Posición estimada por el agente. Declara alcance e impacto para ubicarla con precisión.</p></div></div>
+      </div>
+      <div class="mwrap">
+        <svg viewBox="0 0 ${W} ${H}" class="grafo" role="img" aria-label="Matriz de valor contra esfuerzo">
+          <defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#F7F3FF"/><stop offset="100%" stop-color="#FFF7F1"/></linearGradient></defs>
+          <rect x="${M.l}" y="${M.t}" width="${W-M.l-M.r}" height="${H-M.t-M.b}" fill="url(#mg)" rx="12"/>
+          ${CUADRANTES.map(q=>`<text x="${px(q.x+q.w/2)}" y="${py(100-q.y-(q.y?q.h-7:7))}" class="qt" text-anchor="middle">${q.t}</text>`).join("")}
+          <line x1="${px(50)}" y1="${M.t}" x2="${px(50)}" y2="${H-M.b}" class="eje"/>
+          <line x1="${M.l}" y1="${py(50)}" x2="${W-M.r}" y2="${py(50)}" class="eje"/>
+          <text x="${M.l-10}" y="${M.t+10}" class="ax" text-anchor="end">alto</text>
+          <text x="${M.l-10}" y="${H-M.b}" class="ax" text-anchor="end">bajo</text>
+          <text class="axt" transform="translate(13,${(H-M.b+M.t)/2}) rotate(-90)" text-anchor="middle">Valor</text>
+          <text x="${M.l+4}" y="${H-M.b+18}" class="ax">poco</text>
+          <text x="${W-M.r-4}" y="${H-M.b+18}" class="ax" text-anchor="end">mucho</text>
+          <text x="${(W+M.l-M.r)/2}" y="${H-8}" class="axt" text-anchor="middle">Esfuerzo</text>
+          ${con.map(({e,c})=>{const st=estadoDe(e);
+            const cx=Math.max(M.l+c.r+4,Math.min(W-M.r-c.r-4,px(c.esfuerzo)));
+            const cy=Math.max(M.t+c.r+4,Math.min(H-M.b-c.r-4,py(c.valor)));
+            const nom=(e.iniciativa||e.nombre||"?"), cod=COD[e.id]||"?";
+            const col=c.sinEvaluar?"var(--faint)":st.c;
+            return `<g class="burbuja" onclick="verFicha2('${e.id}')" tabindex="0">
+              <title>${cod} · ${esc(nom)} · ${c.sinEvaluar?"sin evaluar":st.t}${c.estimado&&!c.sinEvaluar?" · posición estimada":""}</title>
+              <circle cx="${cx}" cy="${cy}" r="${c.r}" fill="${col}" fill-opacity="${c.estimado?".5":".9"}"
+                stroke="${c.estimado?col:"#fff"}" stroke-width="2.5" ${c.estimado?'stroke-dasharray="5 4"':""}/>
+              <text x="${cx}" y="${cy+4.5}" class="bcod" text-anchor="middle">${cod}</text>
+            </g>`;}).join("")}
+        </svg>
+      </div>
+    </div>
+    <div class="mcodigos">
+      ${con.map(({e,c})=>{const st=estadoDe(e);
+        return `<button class="mc" onclick="verFicha2('${e.id}')">
+          <span class="cbadge" style="background:${c.sinEvaluar?"var(--faint)":st.c}">${COD[e.id]}</span>
+          <span class="cn">${esc(e.iniciativa||e.nombre)}</span>
+          <span class="cs">${esc(e.squad||"sin squad")}</span></button>`;}).join("")}
+    </div>
+  </section>`;
+}
+
+/* ---------- Podio arrastrable ---------- */
+function ordenPodio(){
+  const L=ultimas();
+  const ids=L.map(e=>e.id);
+  let p=(S.podio||[]).filter(id=>ids.includes(id));
+  ids.forEach(id=>{if(!p.includes(id))p.push(id);});
+  if(!S.podio||S.podio.join()!==p.join()){
+    if(!S.podio){ /* primera vez: ordena por prioridad estimada */
+      p=L.slice().sort((a,b)=>{const x=riceDe(a.prioridad),y=riceDe(b.prioridad);return (y?y.indice:-1)-(x?x.indice:-1);}).map(e=>e.id);
+    }
+    S.podio=p;
+  }
+  return S.podio.map(id=>L.find(e=>e.id===id)).filter(Boolean);
+}
+function podioHTML(){
+  const L=ordenPodio();
+  if(!L.length)return "";
+  return `<section class="podio">
+    <div class="th">
+      <h2 class="subt">El orden de la mesa</h2>
+      <span class="hint">${L.length} iniciativa${L.length===1?"":"s"} en la lista</span>
+    </div>
+    <div class="podioHead">
+      <p><b>Lo que quede más arriba se prioriza primero.</b> Arrastra cualquier fila para moverla de puesto.
+      Entran todas las iniciativas evaluadas, no solo las tres primeras. Este orden lo decides tú: el agente
+      calcula y ordena la matriz, la mesa fija la lista.</p>
+      <div class="escala"><span>Se hace antes</span><i></i><span>Se hace después</span></div>
+    </div>
+    <div class="lista-podio" ondragover="event.preventDefault()">
+      ${L.map((e,i)=>{const st=estadoDe(e),r=riceDe(e.prioridad);
+        return `<div class="pp" draggable="true" data-id="${e.id}"
+          ondragstart="arrastrar(event,'${e.id}')" ondragover="event.preventDefault();this.classList.add('sobre')"
+          ondragleave="this.classList.remove('sobre')" ondrop="soltar(event,'${e.id}')">
+          <span class="puesto ${i<3?"top"+(i+1):""}">${i+1}</span>${i===2&&L.length>3?'<span class="corte"></span>':""}
+          <span class="dot" style="background:${st.c}"></span>
+          <div class="ppn"><b>${esc(e.iniciativa||e.nombre)}</b>
+            <span>${esc(e.squad||"Sin squad")} · ${st.t}${typeof e.puntaje==="number"?" · "+e.puntaje+"/100":""}${r?" · prioridad "+r.indice:""}</span></div>
+          <button class="btn link mini" onclick="verFicha2('${e.id}')">Leer</button>
+          <span class="agarre">⋮⋮</span>
+        </div>`;}).join("")}
+    </div>
+  </section>`;
+}
+function arrastrar(ev,id){S.arrastrando=id;ev.dataTransfer.effectAllowed="move";}
+function soltar(ev,destino){
+  ev.preventDefault();
+  const o=S.arrastrando; if(!o||o===destino){render();return;}
+  const p=S.podio.slice();
+  p.splice(p.indexOf(o),1);
+  p.splice(p.indexOf(destino),0,o);
+  S.podio=p;S.arrastrando=null;persistir();render();
+}
+
+/* ---------- Leyenda del tablero ---------- */
+function leyendaHTML(){
+  return `<div class="leyenda">
+    <div class="lz">
+      <b>Cómo funciona este tablero</b>
+      <p>Cada iniciativa se mide en dos ejes: <strong>qué tan completa está</strong> —la calificación de 0 a 100— y
+      <strong>cuánto promete mover</strong> —la prioridad estimada con el método RICE de Intercom—. El agente calcula;
+      la decisión de qué entra al backlog sigue siendo de la mesa.</p>
+      <button class="btn link mini" onclick="S.verLey=!S.verLey;render()">${S.verLey?"Ocultar el detalle":"Ver cómo se calcula cada una"}</button>
+    </div>
+    ${S.verLey?`<div class="ejes">
+      <div>
+        <b>Calificación · 0 a 100</b>
+        <p>Sale de los seis criterios, pesados así: alineación al negocio 20, evidencia 20, impacto medible 25,
+        plan de entrega 15, dependencias 10, diferenciación 10.</p>
+        ${NIVELES.map(n=>`<div class="nv"><span style="background:${n.c}"></span><b>${n.t}</b> ${n.min>0?n.min+" o más":"menos de 35"}</div>`).join("")}
+      </div>
+      <div>
+        <b>Prioridad estimada · RICE</b>
+        <p>(Alcance × Impacto × Confianza) ÷ Esfuerzo, el modelo que Intercom creó para comparar iniciativas contra
+        un mismo objetivo. Los tres primeros los declara quien la trabaja; la confianza la pone el agente según
+        la calidad de la evidencia.</p>
+        <p class="ad">Es un insumo para la mesa, no una decisión.</p>
+      </div>
+    </div>`:""}
+  </div>`;
+}
+
+function nivelHTML(e,nivel,titulo,nota){
+  const L=(e.admisibilidad||[]).filter(a=>(a.nivel||"esencial")===nivel);
+  if(!L.length)return "";
+  return `<div class="nivel ${nivel}">
+    <div class="nt">${titulo}</div>${nota?`<div class="nn">${nota}</div>`:""}
+    <div style="display:grid;gap:5px;margin-top:8px">${L.map(a=>
+      `<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:13.5px;border-bottom:1px solid var(--paper);padding-bottom:5px">
+        <span>${a.elemento}</span><span class="chip s-${a.estado}">${a.estado}</span></div>`).join("")}</div></div>`;
+}
+/* convierte texto plano en algo legible, respetando títulos y viñetas */
+function comoDoc(t){
+  return (t||"").split(/\n/).map(l=>{
+    const s=l.trim();
+    if(!s)return "";
+    if(/^#{1,3}\s/.test(s))return "<h2>"+esc(s.replace(/^#+\s*/,""))+"</h2>";
+    if(/^\d+(\.\d+)?[.)]\s+\S/.test(s)&&s.length<80)return "<h2>"+esc(s)+"</h2>";
+    if(/^[A-ZÁÉÍÓÚÑ][^.!?]{2,60}:$/.test(s))return "<h3>"+esc(s)+"</h3>";
+    if(/^[-•·*]\s+/.test(s))return "<li>"+esc(s.replace(/^[-•·*]\s+/,""))+"</li>";
+    if(/^[A-Za-zÁÉÍÓÚÑ][^:]{2,28}:\s+\S/.test(s)){const i=s.indexOf(":");
+      return "<p><strong>"+esc(s.slice(0,i+1))+"</strong> "+esc(s.slice(i+1))+"</p>";}
+    return "<p>"+esc(s)+"</p>";
+  }).join("").replace(/(<li>.*?<\/li>)+/g,m=>"<ul>"+m+"</ul>");
+}
+function docHTML(){
+  return `<aside class="card doc">
+    <div style="font-size:13.5px;font-weight:700">${esc(S.exp.nombre)}</div>
+    <div style="font-size:12px;color:var(--faint);margin:4px 0 12px">Tu documento, tal como lo entregaste. Para cambiarlo se crea una versión nueva.</div>
+    <div class="docfmt">${S.exp.prdHtml?S.exp.prdHtml:comoDoc(S.exp.prd)}</div></aside>`;
+}
+
+function actaHTML(e){
+  const abiertas=e.preguntas.filter(p=>p.nolose||!p.respuesta.trim());
+  const faltan=e.criterios.filter(c=>c.estado!=="sustentado");
+  const votos=Object.entries(e.votos);
+  const b=(n,t,c)=>`<div class="bloque"><h3><span class="n">${n}</span>${t}</h3>${c}</div>`;
+  return `<div class="acta">
+    <h2>Acta de evaluación</h2>
+    <div class="metaActa">
+      <div><span>Iniciativa</span>${esc(e.iniciativa||"Sin nombre")}</div>
+      <div><span>Squad</span>${esc(e.squad||"Sin declarar")}</div>
+      <div><span>Responsable</span>${esc(e.autor||"Sin declarar")}</div>
+      <div><span>Fecha y versión</span>${esc(e.fecha||"")} · v${e.version||1}</div>
+    </div>
+    ${b(1,"Veredicto",veredictoHTML(e,false)+
+      ((e.ciclo==="Priorizada"||e.ciclo==="Descartada")&&e.decision?`<div class="decision"><strong>La mesa decidió:</strong> ${esc(e.decision)}</div>`:""))}
+    ${b(2,"Criterio por criterio",e.criterios.map(c=>`<div style="margin-bottom:6px"><strong>${c.nombre}</strong> — ${c.estado}. ${esc(c.nota)}
+      ${c.cita?`<span style="font-family:var(--serif);color:var(--muted)"> “${esc(c.cita)}”</span>`:""}</div>`).join("")+
+      (votos.length?`<div style="margin-top:10px;border-top:1px solid var(--paper);padding-top:8px">`+votos.map(([k,v])=>{
+        const n=e.criterios.find(c=>c.id===k);return `<div style="color:${v.v==="ok"?"var(--verde)":"var(--accent)"};font-size:13px">
+        ${v.v==="ok"?"El PM está de acuerdo en "+n.nombre+".":"El PM no está de acuerdo en "+n.nombre+": "+esc(v.motivo)}</div>`;}).join("")+`</div>`:""))}
+    ${b("1b","Prioridad estimada",fichaHTML(e))}
+    ${b("2b","Qué trae el documento",`<div class="mini">${(e.admisibilidad||[]).filter(a=>(a.nivel||"esencial")==="esencial").map(a=>`<span class="chip s-${a.estado}">${a.elemento}</span>`).join(" ")}</div>
+      <div style="font-size:12px;color:var(--faint);margin:10px 0 5px">Lo que subiría el estándar</div>
+      <div class="mini">${(e.admisibilidad||[]).filter(a=>a.nivel==="mejora").map(a=>`<span class="chip s-${a.estado}">${a.elemento}</span>`).join(" ")}</div>`)}
+    ${b("3a","Preguntas y respuestas",`<div>${(e.preguntas||[]).map(p=>`<div style="margin-bottom:10px"><strong>${esc(p.texto)}</strong><br>${p.nolose?'<span style="color:var(--faint)">El PM declaró que no lo sabe.</span>':(esc(p.respuesta.trim())||'<span style="color:var(--faint)">Sin responder.</span>')}</div>`).join("")}</div>`)}
+    ${(e.cambios&&e.cambios.length)?b("3b","Qué pasó con tus respuestas",`<ul>${e.cambios.map(c=>`<li>${esc(c.criterio)}: ${c.de===c.a?"sigue en "+c.a:"de "+c.de+" a "+c.a}. ${esc(c.porque)}</li>`).join("")}</ul>`):""}
+    ${(e.hilo&&e.hilo.length)?b("+","Lo que el PM preguntó",`<ul>${e.hilo.filter(m=>m.rol==="pm").map(m=>`<li>${esc(m.texto)}</li>`).join("")}</ul>`):""}
+    ${b(3,"Preguntas abiertas",abiertas.length?`<ul>${abiertas.map(p=>`<li>${esc(p.texto)}${p.nolose?' <span style="color:var(--faint)">— el PM declaró que no lo sabe</span>':""}</li>`).join("")}</ul>`:'<span style="color:var(--muted)">Ninguna. Todas quedaron respondidas.</span>')}
+    ${b(4,"Cruces detectados",e.dependencias.length?`<ul>${e.dependencias.map(d=>`<li>${d.tipo} con ${esc(d.iniciativa)} (${d.squad}): ${esc(d.nota)}</li>`).join("")}</ul>`:'<span style="color:var(--muted)">Ninguno dentro de lo que alcanzo a ver.</span>')}
+    ${b(5,"Qué falta",faltan.length?`<ul>${faltan.map(c=>`<li>${c.nombre}: ${esc(c.nota)}</li>`).join("")}</ul>`:'<span style="color:var(--muted)">Nada pendiente.</span>')}
+    <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
+      <button class="btn" onclick="guardar()">Guardar en el tablero</button>
+      <button class="btn sec" onclick="imprimirActa()">Imprimir o guardar en PDF</button>
+      <button class="btn sec" onclick="copiarActa()">Copiar el acta</button>
+      <button class="btn link" onclick="descargarActa()">Guardar el acta</button>
+      <button class="btn link" onclick="descargar()">Guardar el expediente</button>
+    </div></div>`;
+}
+
+function vExp(){
+  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+    <h1 class="tituloV" style="font-size:24px;letter-spacing:-.02em">Tablero de priorización</h1>
+    <span style="font-size:13.5px;color:var(--muted)">Todos los PRD que has pasado, con su calificación y su prioridad estimada.</span></div>
+  ${leyendaHTML()}
+  ${matrizHTML()}
+  ${podioHTML()}
+  <div class="filtros">
+    ${FILTROS.map(f=>{
+      const n=f.k==="todas"?S.expedientes.length:S.expedientes.filter(e=>estadoDe(e).clave===f.k).length;
+      const st=f.k==="todas"?null:(S.expedientes.map(estadoDe).find(x=>x.clave===f.k)||null);
+      const col=st?st.c:"var(--tinta)", bg=st?st.bg:"var(--lilaSuave)";
+      return `<button class="fx ${S.filtro===f.k?"on":""}" onclick="S.filtro='${f.k}';render()"
+        style="${S.filtro===f.k?`color:${col};background:${bg};border-color:${col}40`:""}">
+        <i style="background:${st?st.c:"var(--lila)"}"></i>${f.t}<b>${n}</b></button>`;}).join("")}
+  </div>
+  <div style="display:flex;gap:12px;margin:16px 0 20px;flex-wrap:wrap;align-items:center">
+    <label style="font-size:13px;color:var(--muted);font-weight:600">Ordenar por
+      <select onchange="S.orden=this.value;render()" style="margin-left:8px;border:1px solid var(--line);border-radius:99px;padding:8px 14px;font-family:var(--sans);font-size:13px">
+        <option value="fecha" ${S.orden==="fecha"?"selected":""}>lo más reciente</option>
+        <option value="calif" ${S.orden==="calif"?"selected":""}>calificación</option>
+        <option value="prior" ${S.orden==="prior"?"selected":""}>prioridad estimada</option>
+      </select></label>
+    <label class="btn sec" style="cursor:pointer">Cargar un PRD evaluado
+      <input type="file" accept=".json" style="display:none" onchange="importar(this.files[0])"></label>
+    <button class="btn link" onclick="S.doc='';ir('inicio')">Evaluar un PRD nuevo</button></div>
+  ${S.expedientes.length?ordenados().map(e=>{
+    const otras=S.expedientes.filter(o=>o.iniciativa===e.iniciativa&&o.id!==e.id&&o.criterios);
+    const tieneP=typeof e.puntaje==="number";
+    const sm=estadoDe(e);
+    const rr=tieneP?riceDe(e.prioridad):null, bp=bandaPrioridad(rr);
+    return `<div class="exp"><div class="lat" style="--c1:${sm.c};--c2:${sm.c2}"></div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input class="nom" value="${esc(e.nombre)}" onchange="renombrar('${e.id}',this.value)">
+          ${e.ejemplo?'<span class="ej">ejemplo</span>':""}</div>
+        <div class="marcas">
+          <span class="pill" style="color:${sm.c};background:${sm.bg}">${sm.t}${tieneP?" · "+e.puntaje+"/100":""}</span>
+          ${tieneP?`<span class="pill" style="color:${bp.c};background:${bp.c}12">Prioridad ${rr?bp.t.toLowerCase()+" · "+rr.indice:"por estimar"}</span>`:""}
+          
+        </div>
+        <div style="font-size:13px;color:var(--muted);margin-top:6px;padding-left:5px">${esc(e.lectura||sm.d||"")}</div>
+        <div class="ciclo">
+          ${CICLOS.map(x=>x.k).map(v=>`<button class="${(e.ciclo||"Borrador")===v?"on":""}" onclick="fijarEstado('${e.id}','${v}')">${v}</button>`).join("")}
+          ${(e.ciclo==="Priorizada"||e.ciclo==="Descartada")?`<input placeholder="¿Qué decidió la mesa y por qué?" value="${esc(e.decision||"")}" onchange="fijarDecision('${e.id}',this.value)">`:""}
+        </div>
+        <div class="acciones">
+          <button class="btn link" onclick="verFicha2('${e.id}')">Leer</button>
+          <button class="btn link" onclick="abrir('${e.id}')">Abrir y editar</button>
+          <button class="btn link" onclick="nuevaVersion('${e.id}')">Nueva versión</button>
+          <button class="btn link" onclick="descargarE('${e.id}')">Descargar</button>
+          ${otras.length&&e.criterios?`<button class="btn link" onclick="S.comparando=S.comparando==='${e.id}'?null:'${e.id}';render()">Comparar versiones</button>`:""}
+        </div>
+        ${S.comparando===e.id&&otras.length?vsHTML(otras[0],e):""}
+      </div></div>`;}).join("")
+    :`<div class="vacio">
+        ${ILUS.expedientes()}
+        <h3>Todavía no hay PRD en el tablero</h3>
+        <p>Cada PRD que evalúes queda aquí con su calificación, su prioridad estimada, sus preguntas y su acta.
+        Cuando la vuelvas a pasar corregida, se guarda como versión nueva y puedes comparar las dos.</p>
+        <div style="display:flex;gap:14px;justify-content:center;margin-top:16px;flex-wrap:wrap">
+          <button class="btn" onclick="ir('inicio')">Evaluar un PRD</button>
+        </div></div>`}
+  <div style="display:flex;justify-content:space-between;gap:16px;margin-top:24px;flex-wrap:wrap;align-items:center">
+    <p style="font-size:12.5px;color:var(--faint);max-width:56ch;margin:0">
+      ${Disco.ok?"Tu tablero sigue aquí la próxima vez que abras la herramienta. Descarga un PRD si quieres compartirlo o abrirlo en otro equipo."
+               :"No estoy logrando conservar el tablero en este equipo. Descarga los PRD que necesites guardar."}</p>
+    ${S.expedientes.length?`<button class="btn link" onclick="borrarTodo()">Borrar el tablero</button>`:""}
+  </div>`;
+}
+
+function vsHTML(a,b){
+  const [v1,v2]=a.version<=b.version?[a,b]:[b,a];
+  return `<div class="vs">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:11px;flex-wrap:wrap;font-size:13.5px">
+      <strong>Versión ${v1.version}</strong><span style="color:${SEM[v1.semaforo].c};font-weight:600">${SEM[v1.semaforo].t}</span>
+      <span style="color:var(--faint)">pasó a</span>
+      <strong>Versión ${v2.version}</strong><span style="color:${SEM[v2.semaforo].c};font-weight:600">${SEM[v2.semaforo].t}</span></div>
+    ${v2.criterios.map(c=>{const a0=v1.criterios.find(x=>x.id===c.id);const cam=a0&&a0.estado!==c.estado;
+      return `<div class="fila ${cam?"":"igual"}"><span style="min-width:128px;font-weight:${cam?700:400}">${c.nombre}</span>
+      <span class="chip s-${a0.estado==="débil"?"debil":a0.estado}">${a0.estado}</span><span style="color:var(--faint)">→</span>
+      <span class="chip s-${c.estado==="débil"?"debil":c.estado}">${c.estado}</span></div>`;}).join("")}</div>`;
+}
+
+/* ---------- Registro de iniciativas ---------- */
+function raiz(w){return w.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z]/g,"").slice(0,5);}
+function kwDe(nombre,objetivo){
+  const stop=/^(de|del|la|el|los|las|por|para|con|sin|una|uno|que|y|en|a|al|su|sus)$/i;
+  const w=(nombre+" "+(objetivo||"")).split(/[\s,.;()]+/).filter(x=>x.length>4&&!stop.test(x));
+  return [...new Set(w.map(raiz))].filter(Boolean).slice(0,6);
+}
+function señasDe(i){return (i.kw&&i.kw.length)?i.kw:kwDe(i.nombre,i.objetivo);}
+function nuevaIniciativa(){
+  S.corpus.push({id:"IN-"+(S.corpus.length+1),squad:"",nombre:"",objetivo:"",estado:"En definición",kw:[]});
+  persistir();render();
+}
+function editarIni(idx,campo,valor){
+  const i=S.corpus[idx];if(!i)return;
+  i[campo]=valor;
+  if(campo==="nombre"||campo==="objetivo")i.kw=kwDe(i.nombre,i.objetivo);
+  persistir();
+}
+function borrarIni(idx){S.corpus.splice(idx,1);persistir();render();}
+function exportarCorpus(){
+  const b=new Blob([JSON.stringify(S.corpus,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="iniciativas-spin.json";a.click();
+}
+function importarCorpus(f){
+  if(!f)return;const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const txt=r.result;
+      let lista;
+      if(f.name.toLowerCase().endsWith(".csv")){
+        const fil=txt.split(/\r?\n/).filter(Boolean);
+        const cab=fil[0].toLowerCase();
+        const desde=/squad|iniciativa|nombre|objetivo/.test(cab)?1:0;
+        lista=fil.slice(desde).map((l,n)=>{
+          const c=l.split(/[;,\t]/).map(x=>x.trim().replace(/^"|"$/g,""));
+          return{id:"IN-"+(n+1),squad:c[0]||"",nombre:c[1]||"",objetivo:c[2]||"",estado:c[3]||"En definición",kw:kwDe(c[1]||"",c[2]||"")};
+        });
+      }else{
+        lista=JSON.parse(txt);
+        if(!Array.isArray(lista))throw 0;
+        lista=lista.map((i,n)=>({id:i.id||"IN-"+(n+1),squad:i.squad||"",nombre:i.nombre||i.name||"",
+          objetivo:i.objetivo||i.objective||"",estado:i.estado||"En definición",kw:i.kw||kwDe(i.nombre||i.name||"",i.objetivo||"")}));
+      }
+      if(!lista.length)throw 0;
+      S.corpus=lista;S.corpusEjemplo=false;persistir();
+      set({aviso:"Cargué "+lista.length+" iniciativas. A partir de ahora los cruces se buscan contra estas."});
+    }catch(e){set({aviso:"No pude leer ese archivo. Necesito una lista de iniciativas con squad, nombre, objetivo y estado."});}
+  };
+  r.readAsText(f);
+}
+
+const VISTAS_SQ=[
+ {k:"todas",t:"Todas"},
+ {k:"idea",t:"En construcción",d:e=>(e.ciclo||"Borrador")==="Borrador"},
+ {k:"mesa",t:"Sobre la mesa",d:e=>e.ciclo==="En la mesa"},
+ {k:"prior",t:"Priorizadas",d:e=>e.ciclo==="Priorizada"},
+ {k:"desc",t:"Descartadas",d:e=>e.ciclo==="Descartada"}
+];
+function evaluadasHTML(){
+  const L0=S.expedientes.filter(e=>e.iniciativa&&e.criterios);
+  const vf=VISTAS_SQ.find(v=>v.k===(S.vsq||"todas"))||VISTAS_SQ[0];
+  const L=vf.d?L0.filter(vf.d):L0;
+  const L1=S.sq?L.filter(e=>(e.squad||"Sin squad")===S.sq):L;
+  const q=(S.busca||"").toLowerCase().trim();
+  const F=q?L1.filter(e=>((e.iniciativa||"")+" "+(e.squad||"")+" "+(e.autor||"")).toLowerCase().includes(q)):L1;
+  const squads=[...new Set(F.map(e=>e.squad||"Sin squad"))].sort();
+  return `<section class="evaluadas">
+    <div class="th">
+      <h2 class="subt">Iniciativas que ya pasaron por el agente</h2>
+      <input class="buscar" placeholder="Buscar por iniciativa, squad o responsable" value="${esc(S.busca||"")}"
+        oninput="S.busca=this.value;pintarBusqueda()">
+    </div>
+    <p class="sub" style="margin-bottom:12px">Aquí solo se consultan. Para cambiar su estado o priorizarlas, ve al tablero.</p>
+    <div class="fila-filtros">
+      <select class="selsq" onchange="S.sq=this.value;render()">
+        <option value="">Todos los squads</option>
+        ${[...new Set(L0.map(e=>e.squad||"Sin squad"))].sort().map(s=>`<option value="${esc(s)}" ${S.sq===s?"selected":""}>${esc(s)}</option>`).join("")}
+      </select>
+    <div class="filtros chico">${VISTAS_SQ.map(v=>{
+      const n=v.d?L0.filter(v.d).length:L0.length;
+      return `<button class="fx ${(S.vsq||"todas")===v.k?"on":""}" onclick="S.vsq='${v.k}';render()">${v.t}<b>${n}</b></button>`;}).join("")}</div></div>
+    ${L.length?(F.length?squads.map(sq=>`<div class="grupoSq">
+        <div class="sqh">${esc(sq)}<b>${F.filter(e=>(e.squad||"Sin squad")===sq).length}</b></div>
+        ${F.filter(e=>(e.squad||"Sin squad")===sq).map(e=>{const st=estadoDe(e);
+          return `<div class="fi" onclick="verFicha('${e.id}')" role="button" tabindex="0">
+            <span class="dot" style="background:${st.c}"></span>
+            <div class="fin"><b>${esc(e.iniciativa)}</b><span>v${e.version||1} · ${esc(e.fecha||"")}${e.autor?" · "+esc(e.autor):""}</span></div>
+            <span class="pill" style="color:${st.c};background:${st.bg}">${st.t}${typeof e.puntaje==="number"?" · "+e.puntaje+"/100":""}</span>
+            <span class="ver">Leer →</span>
+          </div>`;}).join("")}
+      </div>`).join(""):`<p class="nada">Ninguna coincide con “${esc(q)}”.</p>`)
+      :`<p class="nada">Todavía no has evaluado ninguna iniciativa. Las que pases por el agente aparecerán aquí con su calificación.</p>`}
+  </section>`;
+}
+function pintarBusqueda(){
+  const foco=document.activeElement===document.querySelector(".buscar");
+  render();
+  if(foco){const i=document.querySelector(".buscar");if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}}
+}
+function verFicha2(id){S.viendo=S.expedientes.find(e=>e.id===id);if(S.viendo){S.volverA="exp";set({vista:"ver"});}}
+function verFicha(id){S.volverA="ini";S.viendo=S.expedientes.find(e=>e.id===id);if(S.viendo)set({vista:"ver"});}
+function vVer(){
+  const e=S.viendo; if(!e)return vExp();
+  const st=estadoDe(e), r=riceDe(e.prioridad);
+  return `<div class="proceso"><button class="volver" onclick="ir(S.volverA||'ini')">← ${S.volverA==="exp"?"Tablero de priorización":"Iniciativas por squad"}</button>
+    <span class="soloL">Vista de consulta · no se puede editar desde aquí</span></div>
+  <div class="split informe"><div class="flujo">
+    <section class="tarjeta">
+      <div class="metaActa">
+        <div><span>Iniciativa</span>${esc(e.iniciativa||"Sin nombre")}</div>
+        <div><span>Squad</span>${esc(e.squad||"Sin declarar")}</div>
+        <div><span>Responsable</span>${esc(e.autor||"Sin declarar")}</div>
+        <div><span>Fecha y versión</span>${esc(e.fecha||"")} · v${e.version||1}</div>
+      </div>
+      ${veredictoHTML(e,true)}
+      <div class="marcas" style="padding-left:0;margin-top:14px">
+        <span class="pill" style="color:${st.c};background:${st.bg}">${st.t}</span>
+        ${r?`<span class="pill" style="color:${bandaPrioridad(r).c};background:var(--paper)">Prioridad ${bandaPrioridad(r).t.toLowerCase()} · ${r.indice}</span>`:`<span class="pill" style="color:var(--faint);background:var(--paper)">Prioridad sin estimar</span>`}
+      </div>
+      ${e.decision?`<div class="decision"><strong>La mesa decidió:</strong> ${esc(e.decision)}</div>`:""}
+    </section>
+    <section class="tarjeta">
+      <div class="th"><h3>Cómo quedó cada criterio</h3></div>
+      ${(e.criterios||[]).map(c=>`<div class="crit">
+        <div class="top"><strong>${c.nombre}</strong><span class="chip s-${c.estado==="débil"?"debil":c.estado}">${c.estado}</span></div>
+        ${c.cita?`<div class="cita">“${esc(c.cita)}”</div>`:""}
+        <div class="nota">${esc(c.nota)}</div></div>`).join("")}
+    </section>
+    ${(e.preguntas||[]).length?`<section class="tarjeta">
+      <div class="th"><h3>Preguntas y respuestas</h3></div>
+      ${e.preguntas.map(q=>`<div class="qa"><b>${esc(q.texto)}</b>
+        <p>${q.nolose?"Quien la trabajó declaró que no lo sabe.":(esc(q.respuesta||"").trim()||"Sin responder.")}</p></div>`).join("")}
+    </section>`:""}
+    <section class="tarjeta">
+      <div class="th"><h3>Qué falta</h3></div>
+      ${(e.criterios||[]).filter(c=>c.estado!=="sustentado").length
+        ?`<ul class="lista">${e.criterios.filter(c=>c.estado!=="sustentado").map(c=>`<li>${c.nombre}: ${esc(c.nota)}</li>`).join("")}</ul>`
+        :`<p class="nada">Nada pendiente.</p>`}
+    </section>
+  </div>${docVerHTML(e)}</div>`;
+}
+function docVerHTML(e){
+  return `<aside class="card doc">
+    <div style="font-size:13.5px;font-weight:700">${esc(e.nombre)}</div>
+    <div style="font-size:12px;color:var(--faint);margin:4px 0 12px">El documento tal como lo entregaron.</div>
+    <div class="docfmt">${e.prdHtml?e.prdHtml:comoDoc(e.prd)}</div></aside>`;
+}
+function vIniciativas(){
+  const n=S.corpus.length;
+  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+    <h1 class="tituloV" style="font-size:24px;letter-spacing:-.02em">Iniciativas por squad</h1>
+    </div>
+  <p style="font-size:14px;color:var(--muted);max-width:66ch;margin:10px 0 0">
+    Aquí va lo que cada squad tiene en marcha. Es lo único que me permite avisarte que tu iniciativa
+    se solapa con algo que ya está haciendo otro equipo, o que depende de ello. Si está vacío evalúo igual,
+    pero sobre esa parte no te puedo decir nada.</p>
+  <div style="display:flex;gap:12px;margin:18px 0;flex-wrap:wrap;align-items:center">
+    <button class="btn" onclick="nuevaIniciativa()">Añadir iniciativa</button>
+    <label class="btn sec" style="cursor:pointer">Importar una lista
+      <input type="file" accept=".json,.csv" style="display:none" onchange="importarCorpus(this.files[0])"></label>
+    ${n?`<button class="btn link" onclick="exportarCorpus()">Exportar</button>`:""}
+    ${S.corpusEjemplo?`<span class="ej">lista de ejemplo</span>`:""}
+  </div>
+  ${evaluadasHTML()}
+  <h2 class="subt">El registro que cargas a mano</h2>
+  <p class="sub" style="margin-bottom:14px">Lo que otros squads tienen en marcha y todavía no ha pasado por aquí. Sirve para detectar cruces.</p>
+  ${n?`<div class="tabla">
+    <div class="fila cab"><span>Squad</span><span>Iniciativa</span><span>Objetivo de negocio</span><span>Estado</span><span></span></div>
+    ${S.corpus.map((i,x)=>`<div class="fila">
+      <input value="${esc(i.squad)}" placeholder="Squad" onchange="editarIni(${x},'squad',this.value)">
+      <input value="${esc(i.nombre)}" placeholder="Nombre de la iniciativa" onchange="editarIni(${x},'nombre',this.value)">
+      <input value="${esc(i.objetivo)}" placeholder="A qué objetivo responde" onchange="editarIni(${x},'objetivo',this.value)">
+      <input value="${esc(i.estado)}" placeholder="Estado" onchange="editarIni(${x},'estado',this.value)">
+      <button class="btn link" onclick="borrarIni(${x})" aria-label="Quitar">Quitar</button>
+    </div>`).join("")}
+  </div>`:`<div class="vacio">
+    ${ILUS.iniciativas()}
+    <h3>Todavía no hay iniciativas cargadas</h3>
+    <p>Sin esto puedo evaluar tu PRD igual, pero no puedo decirte si choca con lo que está haciendo otro squad.
+    Pide a cada PM su lista de iniciativas activas con el objetivo al que responden, y cárgala aquí.</p>
+    <p style="font-size:13px">Puedes cargarla desde un archivo con cuatro columnas: squad, nombre, objetivo y estado.</p>
+  </div>`}
+  <p style="font-size:12.5px;color:var(--faint);margin-top:20px;max-width:64ch">
+    ${Disco.ok?"Esta lista queda guardada. Si trabajas en otro equipo, expórtala y vuelve a cargarla allá."
+             :"No estoy logrando conservar la lista en este equipo. Expórtala para no perderla."}</p>`;
+}
+
+/* ---------- Acta: versión completa y exportable ---------- */
+function actaTexto(e){
+  const L=[];let n=0;const S_=t=>{n++;L.push("## "+n+". "+t);};
+  L.push("# Acta de evaluación — "+(e.iniciativa||"Iniciativa"));
+  L.push("");
+  L.push("- Squad: "+(e.squad||"sin declarar"));
+  L.push("- Responsable: "+(e.autor||"sin declarar"));
+  L.push("- Fecha: "+e.fecha+" · Versión "+(e.version||1));
+  L.push("- Estado del expediente: "+(e.ciclo||"Borrador"));
+  if(e.decision)L.push("- Decisión de la mesa: "+e.decision);
+  L.push("");
+  S_("Veredicto");
+  if(typeof e.puntaje==="number"){
+    const n=nivelDe(e.puntaje);
+    L.push("Calificación de sustentación: "+e.puntaje+" de 100 — "+n.t+".");
+    L.push(n.d);
+    const r=riceDe(e.prioridad);
+    if(r){L.push("Prioridad estimada (RICE): "+r.indice+" de 100 — "+bandaPrioridad(r).t+".");
+      L.push("Alcance "+e.prioridad.alcance+"% de usuarios · Impacto "+e.prioridad.impacto+" · Confianza "+e.prioridad.confianza.valor+"% · Esfuerzo "+e.prioridad.esfuerzo);
+      L.push("Cuadrante: "+cuadranteDe(e.puntaje,r).t+". "+cuadranteDe(e.puntaje,r).d);}
+    else L.push("Prioridad estimada: no calculable. Falta "+faltaRice(e.prioridad).join(" y ")+".");
+  }else L.push((SEM[e.semaforo]||{t:""}).t+". "+(e.lectura||""));
+  L.push("Este resultado mide qué tan sólida está la sustentación, no qué tan prioritaria es la iniciativa.");
+  L.push("");
+  S_("Qué trae el documento");
+  L.push("Lo que un PRD de Spin tiene que traer:");
+  (e.admisibilidad||[]).filter(a=>(a.nivel||"esencial")==="esencial").forEach(a=>L.push("- "+a.elemento+": "+a.estado));
+  L.push("");
+  L.push("Lo que subiría el estándar (no baja el veredicto):");
+  (e.admisibilidad||[]).filter(a=>a.nivel==="mejora").forEach(a=>L.push("- "+a.elemento+": "+a.estado));
+  L.push("");
+  S_("Evaluación criterio por criterio");
+  (e.criterios||[]).forEach(c=>{
+    L.push("### "+c.nombre+" — "+c.estado);
+    L.push(c.nota);
+    if(c.cita)L.push("> \""+c.cita+"\"");
+    const v=(e.votos||{})[c.id];
+    if(v)L.push(v.v==="ok"?"El PM está de acuerdo con esta lectura.":"El PM no está de acuerdo: "+v.motivo);
+    L.push("");
+  });
+  if((e.cambios||[]).length){
+    S_("Qué pasó con tus respuestas");
+    e.cambios.forEach(c=>L.push("- "+c.criterio+": "+(c.de===c.a?"sigue en "+c.a:"de "+c.de+" a "+c.a)+". "+c.porque));
+    L.push("");
+  }
+  S_("Preguntas y respuestas");
+  (e.preguntas||[]).forEach(p=>{
+    L.push("**"+p.texto+"**");
+    L.push(p.nolose?"El PM declaró que no lo sabe.":(p.respuesta.trim()||"Sin responder."));
+    L.push("");
+  });
+  S_("Cruces con otros squads");
+  if((e.dependencias||[]).length)e.dependencias.forEach(d=>L.push("- "+d.tipo+" con "+d.iniciativa+" ("+d.squad+"): "+d.nota));
+  else L.push("Ninguno dentro de las iniciativas cargadas.");
+  if(e.cobertura)L.push("Límite de esta revisión: "+e.cobertura);
+  L.push("");
+  S_("Qué falta antes de la mesa");
+  const f=(e.criterios||[]).filter(c=>c.estado!=="sustentado");
+  if(f.length)f.forEach(c=>L.push("- "+c.nombre+": "+c.nota));
+  else L.push("Nada pendiente.");
+  const ab=(e.preguntas||[]).filter(p=>p.nolose||!p.respuesta.trim());
+  if(ab.length){L.push("");L.push("Preguntas que siguen abiertas:");ab.forEach(p=>L.push("- "+p.texto));}
+  if((e.hilo||[]).filter(m=>m.rol==="pm").length){
+    L.push("");S_("Lo que el PM preguntó durante la evaluación");
+    e.hilo.filter(m=>m.rol==="pm").forEach(m=>L.push("- "+m.texto));
+  }
+  L.push("");
+  L.push("---");
+  L.push("Generado por el Árbitro de priorización de Spin. La evaluación se apoya solo en el texto entregado y en las iniciativas cargadas en la herramienta.");
+  return L.join("\n");
+}
+function copiarActa(){
+  const t=actaTexto(S.exp);
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(()=>set({aviso:"Acta copiada. Pégala donde la necesites."}),
+      ()=>set({aviso:"No pude copiar. Descárgala en su lugar."}));
+  }else set({aviso:"No pude copiar el acta. Descárgala y la tienes igual."});
+}
+function descargarActa(){
+  const b=new Blob([actaTexto(S.exp)],{type:"text/markdown"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);
+  a.download=(S.exp.nombre||"acta").replace(/[^\w\-]+/g,"_")+".md";a.click();
+}
+function imprimirActa(){
+  const z=$("#areaImpresion");
+  z.innerHTML=`<h1 style="font-family:var(--display)">Acta de evaluación</h1>
+    <p><strong>${esc(S.exp.iniciativa||"")}</strong><br>${esc(S.exp.squad||"")} · ${esc(S.exp.fecha||"")} · versión ${S.exp.version||1}${S.exp.autor?" · "+esc(S.exp.autor):""}</p>`
+    +actaTexto(S.exp).split("\n").slice(7).map(l=>{
+      if(l.startsWith("### "))return "<h3>"+esc(l.slice(4))+"</h3>";
+      if(l.startsWith("## "))return "<h2>"+esc(l.slice(3))+"</h2>";
+      if(l.startsWith("> "))return '<blockquote style="border-left:3px solid #C7A1FF;padding-left:10px;font-style:italic">'+esc(l.slice(2))+"</blockquote>";
+      if(l.startsWith("- "))return "<div style='margin-left:14px'>• "+esc(l.slice(2))+"</div>";
+      if(l.startsWith("**"))return "<p><strong>"+esc(l.replace(/\*\*/g,""))+"</strong></p>";
+      if(l==="---")return "<hr>";
+      return l?"<p>"+esc(l)+"</p>":"";
+    }).join("");
+  window.print();
+}
+
+/* ============================================================ ACCIONES */
+let _pantalla="";
+function render(){
+  try{
+  const clave=S.vista+"|"+(S.exp?(S.exp.paso||"")+"|"+S.exp.id:"")+"|"+(S.viendo?S.viendo.id:"");
+  if(clave!==_pantalla){_pantalla=clave;requestAnimationFrame(()=>window.scrollTo({top:0,behavior:"auto"}));}
+  $("#nav-inicio").className=S.vista==="inicio"?"on":"";
+  $("#nav-ini").className=S.vista==="ini"?"on":"";
+  $("#nav-exp").className=S.vista==="exp"?"on":"";
+  const av=S.aviso?`<div class="aviso">${esc(S.aviso)}</div>`:"";
+  $("#main").innerHTML=av+(S.vista==="inicio"?vInicio():S.vista==="chat"?vChat():S.vista==="ini"?vIniciativas():S.vista==="ver"?vVer():vExp());
+  if(S.vista==="inicio"){armarDrop();if(/avanzado/.test(location.search)){const a=$("#avanzado");if(a)a.style.display="block";}}
+  }catch(err){console.error(err);$("#main").innerHTML='<div class="aviso">Algo se rompió al dibujar la pantalla. Recarga el archivo y vuelve a intentarlo.</div>';}
+}
+
+function pintarProgreso(){
+  const e=S.exp,r=e.preguntas.filter(p=>p.nolose||p.respuesta.trim()).length,t=e.preguntas.length;
+  const p=document.querySelector(".progreso"),b=document.querySelector(".barraP i"),
+        btn=[...document.querySelectorAll(".btn")].find(x=>x.textContent.includes("Revisar con mis"));
+  if(p)p.textContent=r+" de "+t+" respondidas";
+  if(b)b.style.width=(t?r/t*100:0)+"%";
+  if(btn)btn.disabled=r!==t;
+}
+function verEjemplo(id){S.exp.ejemplos=S.exp.ejemplos||{};S.exp.ejemplos[id]=!S.exp.ejemplos[id];sincronizar();render();}
+function preguntarEso(t){const i=$("#qbox");if(i){i.value=t;}preguntar();}
+async function preguntar(){
+  const i=$("#qbox");if(!i)return;
+  const t=(i.value||"").trim();if(!t)return;
+  S.exp.hilo=S.exp.hilo||[];
+  S.exp.hilo.push({rol:"pm",texto:t});
+  i.value="";
+  let r=null;
+  if(S.key.trim()){
+    try{
+      const d=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
+        headers:{"Content-Type":"application/json","x-api-key":S.key.trim(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:400,
+          system:SYSTEM+" Ahora el PM te está preguntando algo sobre tu evaluación. Responde en dos o tres frases, en español llano, sin JSON. No escribas el PRD por él.",
+          messages:[{role:"user",content:"EVALUACIÓN:\n"+JSON.stringify(S.exp.criterios)+"\n\nPREGUNTA DEL PM: "+t}]})});
+      if(d.ok){const j=await d.json();r=j.content.filter(b=>b.type==="text").map(b=>b.text).join("").trim();}
+    }catch(e){}
+  }
+  S.exp.hilo.push({rol:"agente",texto:r||responderLocal(t,S.exp)});
+  sincronizar();render();
+  setTimeout(()=>{const q=$("#qbox");if(q)q.focus();},50);
+}
+function fijarEstado(id,v){const e=S.expedientes.find(x=>x.id===id);if(e){e.ciclo=v;if(v==="Borrador")e.decision="";}persistir();render();}
+function fijarDecision(id,v){const e=S.expedientes.find(x=>x.id===id);if(e)e.decision=v;persistir();}
+function nolose(i){const p=S.exp.preguntas[i];p.nolose=!p.nolose;if(p.nolose)p.respuesta="";sincronizar();render();}
+function votar(id,v){
+  if(v===null){delete S.exp.votos[id];render();return;}
+  if(v==="no"){const m=prompt("¿Por qué no estás de acuerdo?");if(!m)return;S.exp.votos[id]={v:"no",motivo:m};}
+  else S.exp.votos[id]={v:"ok"};
+  sincronizar();render();
+}
+
+async function empezar(){
+  const t=(S.doc||"").trim();
+  if(t.length<110){set({aviso:"Con tan poco no alcanzo a orientarte. Cuéntame al menos qué problema viste, a quién le pasa y qué se te ocurrió hacer."});return;}
+  const hoy=new Date().toISOString().slice(0,10);
+  const auto=leerMeta(t);
+  const meta={iniciativa:S.meta.iniciativa||auto.iniciativa,squad:S.meta.squad||auto.squad,autor:S.meta.autor||auto.autor};
+  const ver=versionDe(meta.iniciativa);
+  S.exp={id:"x"+Date.now(),prdHtml:S.docHtml||"",nombre:nombreExp(meta,hoy,ver),iniciativa:meta.iniciativa,
+    squad:meta.squad,autor:meta.autor,version:ver,fecha:hoy,prd:t,votos:{},cambios:[],
+    ejemplos:{},hilo:[],ciclo:"Borrador",cerrado:false};
+  S.exp.paso="lectura";S.exp.qi=0;
+  S.expedientes.unshift(S.exp);persistir();
+  set({vista:"chat",fase:"leyendo",aviso:""});
+
+  let r=null;
+  if(S.key.trim()){try{
+    const m=await evaluarConModelo(t,S.key.trim());
+    const loc=evaluarLocal(t,S.expedientes);
+    r={admisibilidad:loc.admisibilidad,minimos:m.minimos_faltantes||[],noEvaluable:!!m.no_evaluable,
+       criterios:m.criterios||loc.criterios,dependencias:m.dependencias||loc.dependencias,
+       cobertura:m.cobertura||loc.cobertura,
+       preguntas:(m.preguntas||[]).map(p=>({...p,respuesta:"",nolose:false}))};
+  }catch(err){}}
+  if(!r){const loc=evaluarLocal(t,S.expedientes);r={...loc,preguntas:preguntasDe(loc.criterios)};}
+  if(!r.preguntas||!r.preguntas.length)r.preguntas=preguntasDe(r.criterios);
+
+  await new Promise(res=>setTimeout(res,1400));
+  const sem=semaforoDe(r.criterios,r.noEvaluable);
+  Object.assign(S.exp,r,{semaforo:sem,lectura:lecturaDe(r.criterios,sem)});
+  S.exp.puntaje=puntajeDe(r.criterios,r.admisibilidad);
+  S.exp.prioridad=prioridadDe(t,r.criterios);
+  if(ver>1)S.exp.avisos=[...(S.exp.avisos||[]),"Ya tenías “"+meta.iniciativa+"” evaluada. Esta queda como versión "+ver+" y vas a poder comparar las dos."];
+  sincronizar();
+  set({fase:""});
+}
+
+async function revisar(){
+  set({fase:"revisando"});
+  await new Promise(r=>setTimeout(r,1100));
+  const {criterios,cambios}=reevaluarLocal(S.exp);
+  const sem=semaforoDe(criterios,false);
+  Object.assign(S.exp,{criterios,cambios,semaforo:sem,lectura:lecturaDe(criterios,sem),cerrado:true,paso:"informe"});
+  S.exp.puntaje=puntajeDe(criterios,S.exp.admisibilidad);
+  S.exp.prioridad=Object.assign(prioridadDe(S.exp.prd+" "+S.exp.preguntas.map(q=>q.respuesta).join(" "),criterios),{impacto:(S.exp.prioridad||{}).impacto||null});
+  sincronizar();set({fase:""});
+}
+
+function guardar(){
+  const i=S.expedientes.findIndex(e=>e.id===S.exp.id);
+  if(i>=0)S.expedientes[i]=S.exp;else S.expedientes.unshift(S.exp);
+  persistir();ir("exp");
+}
+function sincronizar(){
+  const i=S.expedientes.findIndex(e=>e.id===S.exp.id);
+  if(i>=0)S.expedientes[i]=S.exp;persistir();
+}
+function irPaso(k){S.exp.paso=k;sincronizar();render();}
+function marcarPunto(i){
+  const P=S.exp.preguntas,hechas=P.filter(q=>q.nolose||q.respuesta.trim()).length,listo=hechas===P.length;
+  const b=document.querySelector(".barraP i");if(b)b.style.width=(hechas/P.length*100)+"%";
+  const pt=document.querySelectorAll(".puntos .pt")[i];
+  if(pt)pt.classList.toggle("ok",!!(P[i].respuesta.trim()||P[i].nolose));
+  const av=document.querySelector(".avanzar");
+  if(av){
+    av.disabled=!listo;
+    av.classList.toggle("off",!listo);
+    av.onclick=listo?revisar:null;
+    const t=av.querySelector("b"),e=av.querySelector("em");
+    if(t)t.textContent=listo?"Entregar para calificar":"Te faltan "+(P.length-hechas)+" de "+P.length;
+    if(e)e.textContent=listo?"Reviso con tus respuestas y te entrego la calificación y el informe."
+                            :"Responde todas, o marca las que no sepas. Ninguna se pierde.";
+  }
+}
+function ordenados(){
+  let L=S.expedientes.slice();
+  if(S.filtro&&S.filtro!=="todas")L=L.filter(e=>estadoDe(e).clave===S.filtro);
+  if(S.orden==="calif")L.sort((a,b)=>(b.puntaje||-1)-(a.puntaje||-1));
+  else if(S.orden==="prior")L.sort((a,b)=>{const x=riceDe(a.prioridad),y=riceDe(b.prioridad);return (y?y.indice:-1)-(x?x.indice:-1);});
+  return L;
+}
+function nuevaVersion(id){
+  const e=S.expedientes.find(x=>x.id===id);if(!e)return;
+  S.doc=e.prd; S.meta={iniciativa:e.iniciativa||"",squad:e.squad||"",autor:e.autor||""};
+  set({vista:"inicio",aviso:"Cargué el documento de “"+(e.iniciativa||e.nombre)+"”. Edítalo y vuelve a pasarlo: se guarda como versión "+((e.version||1)+1)+" y podrás compararlas."});
+}
+function abrir(id){S.exp=S.expedientes.find(e=>e.id===id);if(!S.exp.paso)S.exp.paso=S.exp.cerrado?"informe":"lectura";ir("chat");}
+function renombrar(id,v){const e=S.expedientes.find(x=>x.id===id);if(e)e.nombre=v;persistir();}
+function bajar(e){
+  const b=new Blob([JSON.stringify(e,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);
+  a.download=e.nombre.replace(/[^\w\-]+/g,"_")+".json";a.click();
+}
+function descargar(){bajar(S.exp);}
+function descargarE(id){bajar(S.expedientes.find(e=>e.id===id));}
+function importar(f){
+  if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const o=JSON.parse(r.result);
+    if(!o.nombre||!o.criterios||!o.prd)throw 0;
+    o.id="i"+Date.now();S.expedientes.unshift(o);persistir();set({aviso:""});
+  }catch(e){set({aviso:"Ese archivo no es un expediente del Árbitro. Tu lista quedó igual."});}};
+  r.readAsText(f);
+}
+
+/* ---------- Archivos ---------- */
+function armarDrop(){
+  const d=$("#drop");if(!d)return;
+  ["dragenter","dragover"].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.add("over");}));
+  ["dragleave","drop"].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.remove("over");}));
+  d.addEventListener("drop",e=>{if(e.dataTransfer.files[0])leerArchivo(e.dataTransfer.files[0]);});
+}
+async function leerArchivo(f){
+  if(!f)return;
+  const est=$("#estadoArchivo");const di=t=>{if(est)est.textContent=t;};
+  di("Leyendo "+f.name+"…");
+  const n=f.name.toLowerCase();
+  try{
+    if(n.endsWith(".txt")||n.endsWith(".md")){S.doc=await f.text();S.docHtml="";}
+    else if(n.endsWith(".docx")){
+      if(!window.mammoth)throw new Error("lib");
+      const b=await f.arrayBuffer();
+      S.doc=(await mammoth.extractRawText({arrayBuffer:b})).value;
+      try{S.docHtml=(await mammoth.convertToHtml({arrayBuffer:b})).value;}catch(e){S.docHtml="";}
+    }else if(n.endsWith(".pdf")){
+      if(!window.pdfjsLib)throw new Error("lib");
+      pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
+      let t="";for(let i=1;i<=doc.numPages;i++){const p=await doc.getPage(i);
+        t+=(await p.getTextContent()).items.map(x=>x.str).join(" ")+"\n\n";}
+      S.doc=t;S.docHtml="";
+    }else throw new Error("tipo");
+    render();
+    const e2=$("#estadoArchivo");if(e2)e2.textContent="Listo: "+f.name+" ("+S.doc.trim().length+" caracteres).";
+  }catch(err){
+    di(err.message==="lib"
+      ? "No pude abrir ese archivo ahora. Pega el texto directamente y seguimos."
+      : "Ese formato no lo puedo leer. Usa Word, PDF o texto, o pega el contenido.");
+  }
+}
+
+restaurar();
+render();
+</script>
+</body>
+</html>
