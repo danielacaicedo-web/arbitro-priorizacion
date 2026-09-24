@@ -1208,6 +1208,7 @@ const Disco={ok:true,
   escribir(d){try{localStorage.setItem(LLAVE,JSON.stringify(d));return true;}catch(e){Disco.ok=false;return false;}},
   borrar(){try{localStorage.removeItem(LLAVE);}catch(e){}}
 };
+let S={verLista:false,verLey:false,sq:"",podio:null,arrastrando:null,busca:"",vsq:"todas",viendo:null,docHtml:"",vista:"inicio",doc:"",exp:null,key:"",expedientes:[],corpus:[],corpusEjemplo:false,orden:"fecha",filtro:"todas",
        meta:{iniciativa:"",squad:"",autor:""},aviso:"",fase:"",comparando:null,editando:null};
 function corpusActual(){return S.corpus||[];}
 function persistir(){
