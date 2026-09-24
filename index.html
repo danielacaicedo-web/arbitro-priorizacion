@@ -7,160 +7,89 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
 
 <style>
 :root{
-  padding-top:env(safe-area-inset-top,0px);
-  padding-bottom:env(safe-area-inset-bottom,0px);
-  box-sizing:border-box;
-  --morado:#5601D9; --naranja:#FC630E;
-  --moradoOsc:#210B50; --cafe:#542200; --grisOsc:#2D2F3A;
-  --lila:#C7A1FF; --naranjaClaro:#FFA366;
-  --lilaSuave:#EEE3FF; --duraznoSuave:#FFF0E5; --peri:#D9DBFD;
+  --morado:#5601D9; --naranja:#FC630E; --lilaSuave:#EEE3FF; 
   --paper:#F6F4FB; --surface:#FFFFFF; --ink:#2D2F3A; --tinta:#210B50;
-  --muted:#6B6C7A; --faint:#9B9CA9; --line:#E9E4F5;
-  --accent:var(--morado); --accentSoft:var(--lilaSuave);
-  --verde:#5601D9; --verdeSoft:#EEE3FF;
-  --ambar:#C24A00; --ambarSoft:#FFF0E5;
-  --rojo:#2D2F3A;  --rojoSoft:#D9DBFD;
+  --muted:#6B6C7A; --line:#E9E4F5; --verdeSoft:#E6F4EC;
   --sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
   --display:'Rethink Sans','Inter',system-ui,sans-serif;
-  --serif:Georgia,'Times New Roman',serif;
-  --r:20px; --rs:14px;
+  --r:20px;
 }
 *{box-sizing:border-box}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
-button{font-family:inherit}
-*:focus-visible{outline:2px solid var(--morado);outline-offset:3px}
-h1,h2,h3,.display{font-family:var(--display);letter-spacing:-.025em;color:var(--tinta)}
-header{background:rgba(255,255,255,.88);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);
-  padding:calc(12px + env(safe-area-inset-top,0px)) 26px 12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:30}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55}
+header{background:rgba(255,255,255,.88);border-bottom:1px solid var(--line);padding:20px 26px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:30}
 .marca{display:flex;align-items:center;gap:11px}
-.marca .sep{width:1px;height:20px;background:var(--line)}
-.marca .prod{font-family:var(--display);font-weight:600;font-size:14.5px;color:var(--tinta);letter-spacing:-.02em}
+.marca .prod{font-family:var(--display);font-weight:600;font-size:14.5px;color:var(--tinta)}
 nav{margin-left:auto;display:flex;gap:4px;background:var(--paper);padding:4px;border-radius:99px}
-nav button{background:none;border:none;color:var(--muted);padding:8px 15px;border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;transition:all .18s}
-nav button:hover:not(:disabled){color:var(--tinta)}
+nav button{background:none;border:none;color:var(--muted);padding:8px 15px;border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
+nav button:hover{color:var(--tinta)}
 nav button.on{background:var(--surface);color:var(--morado);box-shadow:0 1px 3px rgba(33,11,80,.1)}
 main{max-width:1180px;margin:0 auto;padding:30px 26px 80px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px}
-.btn{background:var(--morado);color:#fff;border:1px solid var(--morado);padding:12px 22px;border-radius:99px;font-size:14px;font-weight:600;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 2px 10px rgba(86,1,217,.22)}
-.btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(86,1,217,.28)}
-footer{border-top:1px solid var(--line);padding:20px;text-align:center;font-size:12px;color:var(--faint)}
-.sync-status{position:fixed;bottom:20px;right:20px;padding:12px 16px;border-radius:99px;font-size:12px;font-weight:600;background:var(--lilaSuave);color:var(--morado);z-index:100}
-.sync-status.synced{background:var(--verdeSoft)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px;margin-bottom:20px}
+.btn{background:var(--morado);color:#fff;border:none;padding:12px 22px;border-radius:99px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(86,1,217,.2)}
+.btn.sec{background:var(--lilaSuave);color:var(--morado)}
+h1,h2,h3{font-family:var(--display);color:var(--tinta);margin:0 0 16px}
+footer{border-top:1px solid var(--line);padding:20px;text-align:center;font-size:12px;color:var(--muted)}
+.sync-status{position:fixed;bottom:20px;right:20px;padding:12px 16px;border-radius:99px;font-size:12px;font-weight:600;background:var(--lilaSuave);color:var(--morado);z-index:100;transition:all .3s}
+.sync-status.saved{background:var(--verdeSoft);color:#1E7A4B}
+.iniciativa{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.iniciativa .info{flex:1}
+.iniciativa .nombre{font-weight:600;color:var(--tinta);margin-bottom:4px}
+.iniciativa .squad{font-size:12px;color:var(--muted)}
+.iniciativa .btn{padding:6px 12px;font-size:12px;margin-left:10px}
+ul{list-style:none;padding:0;margin:0}
 </style>
 </head>
 <body>
 
 <header>
   <div class="marca">
-    <svg width="52" height="30" viewBox="0 0 600 341" role="img" aria-label="Spin"><path d="M75.3183 120.54C90.9065 120.54 104.168 124.162 115.785 135.064L138.336 108.627C119.442 92.1175 100.197 87.172 74.6534 87.172C44.7883 87.172 5.65164 100.391 5.65164 138.024C5.65164 175.014 42.4797 186.229 73.3236 188.545C96.5397 189.869 105.83 194.483 105.83 205.716C105.83 217.611 91.5529 225.535 76.2972 225.204C58.0494 224.873 31.5273 215.295 19.91 202.426L0 231.161C23.881 255.943 49.7566 260.227 75.6323 260.227C122.415 260.227 145.964 235.463 145.964 206.728C145.964 163.468 106.809 156.537 75.9647 154.552C55.0758 153.228 45.4532 147.29 45.4532 136.719C45.4532 126.478 56.0732 120.54 75.3183 120.54Z" fill="#5601D9"></path></svg>
-    <div class="sep"></div>
-    <div class="prod">Árbitro de priorización</div>
+    <div class="prod">📋 Árbitro de priorización</div>
   </div>
   <nav>
     <button id="nav-inicio" class="on" onclick="ir('inicio')">Nueva evaluación</button>
-    <button id="nav-ini" onclick="ir('ini')">Iniciativas por squad</button>
-    <button id="nav-exp" onclick="ir('exp')">Tablero de priorización</button>
+    <button id="nav-ini" onclick="ir('ini')">Iniciativas</button>
   </nav>
 </header>
 
 <main id="main"></main>
-<div id="sync-status" class="sync-status">Sincronizando...</div>
+<div id="sync-status" class="sync-status">✓ Listo</div>
 <footer>Árbitro de priorización · Spin</footer>
 
 <script>
-let db = null;
 let INICIATIVAS = [];
-let EVALUACIONES = [];
-let unsubscribeInit = null;
-let unsubscribeEval = null;
+let currentView = 'inicio';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyC7•••••••••••••••••••••••••••••••",
-  authDomain: "arbitro-priorizacion.firebaseapp.com",
-  projectId: "arbitro-priorizacion",
-  storageBucket: "arbitro-priorizacion.firebasestorage.app",
-  messagingSenderId: "131041210503",
-  appId: "1:131041210503:web:88b7a765d3107e5c428822"
-};
-
-function initFirebase() {
-  if (typeof firebase === 'undefined') {
-    setTimeout(initFirebase, 100);
-    return;
-  }
+function loadData() {
   try {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    console.log('Firebase iniciado');
-    init();
-  } catch (error) {
-    console.error('Firebase error:', error);
-  }
-}
-
-function syncIniciativas() {
-  if (!db) return;
-  if (unsubscribeInit) unsubscribeInit();
-  unsubscribeInit = db.collection('iniciativas').onSnapshot(snapshot => {
+    const data = localStorage.getItem('arbitro_iniciativas');
+    INICIATIVAS = data ? JSON.parse(data) : [];
+  } catch (e) {
     INICIATIVAS = [];
-    snapshot.forEach(doc => {
-      INICIATIVAS.push({id: doc.id, ...doc.data()});
-    });
-    updateSync();
-    if (window.currentView) mostrarVista(window.currentView);
-  });
-}
-
-function syncEvaluaciones() {
-  if (!db) return;
-  if (unsubscribeEval) unsubscribeEval();
-  unsubscribeEval = db.collection('evaluaciones').onSnapshot(snapshot => {
-    EVALUACIONES = [];
-    snapshot.forEach(doc => {
-      EVALUACIONES.push({id: doc.id, ...doc.data()});
-    });
-    updateSync();
-    if (window.currentView) mostrarVista(window.currentView);
-  });
-}
-
-async function guardarIniciativa(iniciativa) {
-  if (!db) return;
-  try {
-    if (iniciativa.id) {
-      await db.collection('iniciativas').doc(iniciativa.id).update(iniciativa);
-    } else {
-      iniciativa.id = Date.now().toString();
-      await db.collection('iniciativas').doc(iniciativa.id).set(iniciativa);
-    }
-  } catch (error) {
-    alert('Error guardando: ' + error.message);
   }
-}
-
-function updateSync() {
-  const el = document.getElementById('sync-status');
-  el.textContent = 'Sincronizado ✓';
-  el.classList.add('synced');
-  setTimeout(() => el.classList.remove('synced'), 2000);
-}
-
-function init() {
-  syncIniciativas();
-  syncEvaluaciones();
   mostrarVista('inicio');
 }
 
+function saveData() {
+  localStorage.setItem('arbitro_iniciativas', JSON.stringify(INICIATIVAS));
+  showSaved();
+}
+
+function showSaved() {
+  const status = document.getElementById('sync-status');
+  status.textContent = '✓ Guardado';
+  status.classList.add('saved');
+  setTimeout(() => {
+    status.classList.remove('saved');
+    status.textContent = '✓ Listo';
+  }, 2000);
+}
+
 function ir(vista) {
-  window.currentView = vista;
+  currentView = vista;
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('on'));
   document.getElementById('nav-' + vista).classList.add('on');
   mostrarVista(vista);
@@ -168,38 +97,92 @@ function ir(vista) {
 
 function mostrarVista(vista) {
   const main = document.getElementById('main');
+  
   if (vista === 'inicio') {
     main.innerHTML = `
       <div class="card">
         <h1>Nueva evaluación</h1>
-        <p>Iniciativas: ${INICIATIVAS.length}</p>
-        <button class="btn" onclick="nuevaIniciativa()">+ Agregar</button>
+        <p style="margin:0 0 20px; color:var(--muted)">Total de iniciativas: <strong style="color:var(--tinta)">${INICIATIVAS.length}</strong></p>
+        <button class="btn" onclick="nuevaIniciativa()">+ Agregar iniciativa</button>
       </div>
+      ${INICIATIVAS.length > 0 ? `
+        <div class="card">
+          <h2>Últimas iniciativas</h2>
+          <ul>
+            ${INICIATIVAS.slice(-5).reverse().map(i => `
+              <li class="iniciativa">
+                <div class="info">
+                  <div class="nombre">${i.nombre}</div>
+                  <div class="squad">${i.squad} · ${i.estado}</div>
+                </div>
+                <button class="btn sec" onclick="eliminarIniciativa(${i.id})">✕</button>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      ` : ''}
     `;
   } else if (vista === 'ini') {
-    let html = '<div class="card"><h2>Iniciativas</h2>';
     const squads = {};
-    INICIATIVAS.forEach(i => {
-      if (!squads[i.squad]) squads[i.squad] = [];
-      squads[i.squad].push(i);
+    INICIATIVAS.forEach(init => {
+      if (!squads[init.squad]) squads[init.squad] = [];
+      squads[init.squad].push(init);
     });
-    for (const s in squads) {
-      html += `<h3>${s}</h3><ul>`;
-      squads[s].forEach(i => html += `<li>${i.nombre}</li>`);
-      html += '</ul>';
+    
+    let html = '<div class="card"><h2>Iniciativas por squad</h2>';
+    if (INICIATIVAS.length === 0) {
+      html += '<p style="color:var(--muted)">No hay iniciativas aún</p>';
+    } else {
+      for (const squad in squads) {
+        html += `<h3 style="margin-top:20px">${squad}</h3><ul>`;
+        squads[squad].forEach(init => {
+          html += `<li class="iniciativa">
+            <div class="info">
+              <div class="nombre">${init.nombre}</div>
+              <div class="squad">${init.estado}</div>
+            </div>
+            <button class="btn sec" onclick="eliminarIniciativa(${init.id})">✕</button>
+          </li>`;
+        });
+        html += '</ul>';
+      }
     }
     main.innerHTML = html + '</div>';
   }
 }
 
 function nuevaIniciativa() {
-  const nombre = prompt('Nombre:');
-  if (nombre) {
-    const squad = prompt('Squad:');
-    guardarIniciativa({nombre, squad, estado: 'En definición'});
+  const nombre = prompt('Nombre de la iniciativa:');
+  if (!nombre) return;
+  
+  const squad = prompt('Squad:');
+  if (!squad) return;
+  
+  INICIATIVAS.push({
+    id: Date.now(),
+    nombre: nombre.trim(),
+    squad: squad.trim(),
+    estado: 'En definición',
+    timestamp: new Date().toISOString()
+  });
+  
+  saveData();
+  mostrarVista(currentView);
+}
+
+function eliminarIniciativa(id) {
+  if (confirm('¿Eliminar esta iniciativa?')) {
+    INICIATIVAS = INICIATIVAS.filter(i => i.id !== id);
+    saveData();
+    mostrarVista(currentView);
   }
 }
 
+document.addEventListener('DOMContentLoaded', loadData);
+</script>
+
+</body>
+</html>
 document.addEventListener('DOMContentLoaded', initFirebase);
 </script>
 </body>
