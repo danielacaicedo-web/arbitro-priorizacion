@@ -212,8 +212,11 @@ input[type=password],input[type=text]{border:1px solid var(--line);border-radius
 .vacio p{color:var(--muted);font-size:14px;margin:0 auto 8px;max-width:52ch}
 .meta3{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
 .meta3 label{font-size:12px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;gap:5px}
-.meta3 input{border:1px solid var(--line);border-radius:99px;padding:10px 15px;font-size:13.5px;font-family:var(--sans);color:var(--ink)}
-.meta3 input:focus{border-color:var(--lila);outline:none}
+.meta3 input,.meta3 select{border:1px solid var(--line);border-radius:99px;padding:10px 15px;font-size:13.5px;font-family:var(--sans);color:var(--ink);background:#fff}
+.meta3 input:focus,.meta3 select:focus{border-color:var(--lila);outline:none}
+.meta3 select{appearance:none;-webkit-appearance:none;padding-right:34px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236B6C7A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center}
 .metaActa{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0 20px;padding:14px 0;border-top:1px solid var(--paper);border-bottom:1px solid var(--paper)}
 .metaActa div{font-size:13.5px;color:var(--tinta);font-weight:600}
 .metaActa span{display:block;font-size:10.5px;font-weight:700;color:var(--faint);margin-bottom:3px}
