@@ -637,7 +637,7 @@ footer{border-top:1px solid var(--line);padding:20px;text-align:center;font-size
   </div>
   
   <nav>
-    <button id="nav-inicio" class="on" onclick="S.doc='';S.meta={iniciativa:'',squad:'',autor:''};ir('inicio')">Nueva evaluación</button>
+    <button id="nav-inicio" class="on" onclick="S.doc='';S.meta={iniciativa:'',squad:'',autor:''};S.colaSeleccion=null;S.colaPendiente=null;ir('inicio')">Nueva evaluación</button>
     <button id="nav-ini" onclick="ir('ini')">Iniciativas por squad</button>
     <button id="nav-exp" onclick="ir('exp')">Tablero de priorización</button>
   </nav>
@@ -1241,12 +1241,21 @@ async function evaluarConModelo(txt){
   if(!r.ok)throw new Error("sin respuesta");
   return await r.json();
 }
+/* Resumen corto para el panel lateral (Epic 7.11) — reemplaza mostrar el texto crudo.
+   Si falla, docHTML()/docVerHTML() caen solas al texto original. */
+async function resumirConIA(txt){
+  const r=await fetch("/api/resumir",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({txt})});
+  if(!r.ok)throw new Error("sin respuesta");
+  const d=await r.json();
+  return d.resumen||null;
+}
 
 /* ============================================================ ESTADO
    Vive en Firestore (espacio compartido, sin login). S.expedientes/S.corpus/S.podio
    se mantienen sincronizados en vivo por los listeners que arrancan al final del archivo. */
 let S={verLey:false,sq:"",podio:null,arrastrando:null,busca:"",vsq:"todas",viendo:null,docHtml:"",vista:"inicio",doc:"",exp:null,expedientes:[],corpus:[],orden:"fecha",filtro:"todas",
-       meta:{iniciativa:"",squad:"",autor:""},aviso:"",fase:"",comparando:null,editando:null};
+       meta:{iniciativa:"",squad:"",autor:""},aviso:"",fase:"",comparando:null,editando:null,colaSeleccion:null,colaPendiente:null};
 function corpusActual(){return S.corpus||[];}
 /* Guarda el expediente indicado (o S.exp si no se pasa ninguno) en Firestore. */
 function guardarExp(exp){Fire.guardarExpediente(exp||S.exp);}
@@ -1389,7 +1398,11 @@ const ILUS={
 
 /* ============================================================ VISTAS */
 function vInicio(){
-  return `<div class="hero">
+  if(S.colaSeleccion)return vSeleccionMulti();
+  const colaAviso=S.colaPendiente&&S.colaPendiente.length
+    ?`<div class="avisos"><div>Te quedan ${S.colaPendiente.length} iniciativa${S.colaPendiente.length===1?"":"s"} más en la cola que armaste. Completa esta, evalúala, y te muestro la siguiente. <button class="btn link mini" onclick="S.colaPendiente=null;render()">Cancelar la cola</button></div></div>`
+    :"";
+  return `${colaAviso}<div class="hero">
     <div>
       <span class="kicker">Desde la idea hasta la mesa <b>·</b> Spin</span>
       <h1>Trae tu idea como esté y te digo qué le falta</h1>
@@ -1427,8 +1440,8 @@ function vInicio(){
 
     <div class="drop" id="drop">
       También puedes <label style="color:var(--accent);font-weight:600;cursor:pointer;text-decoration:underline">
-      subir un archivo<input type="file" accept=".docx,.pdf,.txt,.md" style="display:none" onchange="leerArchivo(this.files[0])"></label>
-      o arrastrarlo aquí. Word, PDF o texto.
+      subir un archivo<input type="file" accept=".docx,.pdf,.txt,.md,.xlsx,.xls" style="display:none" onchange="leerArchivo(this.files[0])"></label>
+      o arrastrarlo aquí. Word, PDF, Excel o texto. Si el Excel trae varias iniciativas, te dejo elegir cuáles evaluar.
       <div id="estadoArchivo" style="font-size:12.5px;color:var(--faint);margin-top:6px"></div>
     </div>
 
@@ -1437,6 +1450,50 @@ function vInicio(){
       <button class="btn link" onclick="S.doc=PRD_V1;S.meta={iniciativa:'Alertas de consumo en tiempo real',squad:'Card Experience',autor:''};render()">Usar una iniciativa de ejemplo</button>
     </div>
   </div>`;
+}
+
+/* ---------- Varias iniciativas en un mismo archivo (Epic 2.s) ---------- */
+function textoDesdeFila(i){
+  const l=[];
+  if(i.nombre)l.push("Iniciativa: "+i.nombre);
+  if(i.squad)l.push("Squad: "+i.squad);
+  if(i.objetivo)l.push("Objetivo: "+i.objetivo);
+  if(i.estado)l.push("Estado: "+i.estado);
+  return l.join("\n");
+}
+function vSeleccionMulti(){
+  const L=S.colaSeleccion;
+  const n=L.filter(i=>i.elegida).length;
+  return `<div class="card">
+    <h2 style="margin-top:0">Encontré ${L.length} iniciativas en tu archivo</h2>
+    <p class="sub">Elige cuáles quieres evaluar. Te las voy a mostrar una por una: completas o corriges cada una antes de evaluarla — nada se evalúa automáticamente.</p>
+    <div style="display:flex;gap:10px;margin:10px 0">
+      <button class="btn link mini" onclick="S.colaSeleccion.forEach(i=>i.elegida=true);render()">Seleccionar todas</button>
+      <button class="btn link mini" onclick="S.colaSeleccion.forEach(i=>i.elegida=false);render()">Ninguna</button>
+    </div>
+    <div style="display:grid;gap:8px;margin:14px 0">
+      ${L.map((i,x)=>`<label style="display:flex;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;cursor:pointer">
+        <input type="checkbox" ${i.elegida?"checked":""} onchange="S.colaSeleccion[${x}].elegida=this.checked;render()">
+        <div><b>${esc(i.nombre||"Sin nombre")}</b><div style="font-size:12px;color:var(--faint)">${esc(i.squad||"Sin squad")}${i.objetivo?" · "+esc(i.objetivo):""}</div></div>
+      </label>`).join("")}
+    </div>
+    <div style="display:flex;gap:12px">
+      <button class="btn" ${n?"":"disabled"} onclick="iniciarColaEvaluacion()">Evaluar ${n?n+" seleccionadas":"seleccionadas"}</button>
+      <button class="btn sec" onclick="S.colaSeleccion=null;render()">Cancelar</button>
+    </div>
+  </div>`;
+}
+function iniciarColaEvaluacion(){
+  S.colaPendiente=S.colaSeleccion.filter(i=>i.elegida);
+  S.colaSeleccion=null;
+  cargarSiguienteDeCola();
+}
+function cargarSiguienteDeCola(){
+  if(!S.colaPendiente||!S.colaPendiente.length){S.colaPendiente=null;render();return;}
+  const item=S.colaPendiente.shift();
+  S.doc=textoDesdeFila(item);S.docHtml="";
+  S.meta={iniciativa:item.nombre||"",squad:item.squad||"",autor:S.meta.autor||""};
+  set({vista:"inicio",aviso:"Completa o corrige esta iniciativa antes de evaluarla."+(S.colaPendiente.length?" Te quedan "+S.colaPendiente.length+" más en la cola.":" Es la última de la cola.")});
 }
 
 function semHTML(sem,lectura,grande){
@@ -1941,11 +1998,23 @@ function comoDoc(t){
     return "<p>"+esc(s)+"</p>";
   }).join("").replace(/(<li>.*?<\/li>)+/g,m=>"<ul>"+m+"</ul>");
 }
-function docHTML(){
+/* Panel lateral: resumen generado por IA (con disclaimer) si existe; si no
+   (falló la generación, o es un expediente de antes de este cambio), cae al
+   texto original tal cual — nunca se queda sin mostrar nada. */
+function panelDocHTML(exp,nota){
+  const resumen=exp.resumenIA;
   return `<aside class="card doc">
-    <div style="font-size:13.5px;font-weight:700">${esc(S.exp.nombre)}</div>
-    <div style="font-size:12px;color:var(--faint);margin:4px 0 12px">Tu iniciativa, tal como la entregaste. Para cambiarla se crea una versión nueva.</div>
-    <div class="docfmt">${S.exp.prdHtml?S.exp.prdHtml:comoDoc(S.exp.prd)}</div></aside>`;
+    <div style="font-size:13.5px;font-weight:700">${esc(exp.nombre)}</div>
+    ${resumen?`
+      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.03em;margin:6px 0 2px">Resumen generado por IA</div>
+      <div style="font-size:12px;color:var(--faint);margin:0 0 12px">No es el texto original — puede no capturar todos los detalles.</div>
+      <div class="docfmt">${esc(resumen)}</div>`
+    :`<div style="font-size:12px;color:var(--faint);margin:4px 0 12px">${nota}</div>
+      <div class="docfmt">${exp.prdHtml?exp.prdHtml:comoDoc(exp.prd)}</div>`}
+  </aside>`;
+}
+function docHTML(){
+  return panelDocHTML(S.exp,"Tu iniciativa, tal como la entregaste. Para cambiarla se crea una versión nueva.");
 }
 
 function actaHTML(e){
@@ -2017,7 +2086,7 @@ function vExp(){
         <option value="calif" ${S.orden==="calif"?"selected":""}>calificación</option>
         <option value="prior" ${S.orden==="prior"?"selected":""}>prioridad estimada</option>
       </select></label>
-    <button class="btn link" onclick="S.doc='';S.meta={iniciativa:'',squad:'',autor:''};ir('inicio')">Evaluar una iniciativa nueva</button></div>
+    <button class="btn link" onclick="S.doc='';S.meta={iniciativa:'',squad:'',autor:''};S.colaSeleccion=null;S.colaPendiente=null;ir('inicio')">Evaluar una iniciativa nueva</button></div>
   ${S.expedientes.length?ordenados().map(e=>{
     const otras=S.expedientes.filter(o=>o.iniciativa===e.iniciativa&&o.id!==e.id&&o.criterios);
     const tieneP=typeof e.puntaje==="number";
@@ -2052,7 +2121,7 @@ function vExp(){
         <p>Cada iniciativa que evalúes queda aquí con su calificación, su prioridad estimada, sus preguntas y su informe.
         Cuando la vuelvas a pasar corregida, se guarda como versión nueva y puedes comparar las dos.</p>
         <div style="display:flex;gap:14px;justify-content:center;margin-top:16px;flex-wrap:wrap">
-          <button class="btn" onclick="S.doc='';S.meta={iniciativa:'',squad:'',autor:''};ir('inicio')">Evaluar una iniciativa</button>
+          <button class="btn" onclick="S.doc='';S.meta={iniciativa:'',squad:'',autor:''};S.colaSeleccion=null;S.colaPendiente=null;ir('inicio')">Evaluar una iniciativa</button>
         </div></div>`}
   <div style="display:flex;justify-content:space-between;gap:16px;margin-top:24px;flex-wrap:wrap;align-items:center">
     <p style="font-size:12.5px;color:var(--faint);max-width:56ch;margin:0">
@@ -2144,9 +2213,10 @@ function importarCorpus(f){
   if(!f)return;
   const nombre=f.name.toLowerCase();
   const r=new FileReader();
-  const avisoError=()=>set({aviso:"No pude leer ese archivo. Necesito una lista con columnas squad, iniciativa, objetivo y estado — en Excel (.xlsx), CSV o JSON. Si tiene varias hojas o un formato distinto, exporta solo la hoja con el listado como CSV e inténtalo de nuevo."});
+  const avisoError=()=>set({aviso:"No pude leer ese archivo. Necesito una lista con columnas squad, iniciativa, objetivo y estado — en Excel (.xlsx), CSV o JSON. Si tiene varias hojas o un formato distinto, exporta solo la hoja con el listado como CSV e inténtalo de nuevo. Importa un archivo a la vez: cada import reemplaza la lista completa."});
   const guardar=lista=>{
     if(!lista||!lista.length)throw 0;
+    if(S.corpus.length&&!confirm("Esto va a reemplazar las "+S.corpus.length+" iniciativas actuales por las "+lista.length+" del archivo nuevo. ¿Seguro?"))return;
     S.corpus=lista;guardarCorpusFn();
     set({aviso:"Cargué "+lista.length+" iniciativas. A partir de ahora los cruces se buscan contra estas."});
   };
@@ -2269,10 +2339,7 @@ function vVer(){
   </div>${docVerHTML(e)}</div>`;
 }
 function docVerHTML(e){
-  return `<aside class="card doc">
-    <div style="font-size:13.5px;font-weight:700">${esc(e.nombre)}</div>
-    <div style="font-size:12px;color:var(--faint);margin:4px 0 12px">La iniciativa tal como la entregaron.</div>
-    <div class="docfmt">${e.prdHtml?e.prdHtml:comoDoc(e.prd)}</div></aside>`;
+  return panelDocHTML(e,"La iniciativa tal como la entregaron.");
 }
 function vIniciativas(){
   const n=S.corpus.length;
@@ -2293,6 +2360,7 @@ function vIniciativas(){
       <input type="file" accept=".xlsx,.xls,.csv,.json" style="display:none" onchange="importarCorpus(this.files[0])"></label>
     ${n?`<button class="btn link" onclick="exportarCorpus()">Exportar</button>`:""}
   </div>
+  <p style="font-size:12px;color:var(--faint);margin:-10px 0 14px">Importa un archivo a la vez: cada import reemplaza la lista completa, no la mezcla con lo que ya tenías.</p>
   ${n?`<div class="tabla">
     <div class="fila cab"><span>Squad</span><span>Iniciativa</span><span>Objetivo de negocio</span><span>Estado</span><span></span></div>
     ${S.corpus.map((i,x)=>`<div class="fila">
@@ -2477,6 +2545,8 @@ async function empezar(){
   S.expedientes.unshift(S.exp);guardarExp(S.exp);Fire.logEvento(S.exp.autor,"evaluar",S.exp.id);
   set({vista:"chat",fase:"leyendo",aviso:""});
 
+  const resumenPromise=resumirConIA(t).catch(()=>null);
+
   let r=null,modoIA=false;
   try{
     const m=await evaluarConModelo(t);
@@ -2490,9 +2560,10 @@ async function empezar(){
   if(!r){const loc=evaluarLocal(t,S.expedientes);r={...loc,preguntas:preguntasDe(loc.criterios)};}
   if(!r.preguntas||!r.preguntas.length)r.preguntas=preguntasDe(r.criterios);
 
+  const resumenIA=await resumenPromise;
   await new Promise(res=>setTimeout(res,1400));
   const sem=semaforoDe(r.criterios,r.noEvaluable);
-  Object.assign(S.exp,r,{semaforo:sem,lectura:lecturaDe(r.criterios,sem),modoIA});
+  Object.assign(S.exp,r,{semaforo:sem,lectura:lecturaDe(r.criterios,sem),modoIA,resumenIA});
   S.exp.puntaje=puntajeDe(r.criterios,r.admisibilidad);
   S.exp.prioridad=prioridadDe(t,r.criterios);
   if(ver>1)S.exp.avisos=[...(S.exp.avisos||[]),"Ya tenías “"+meta.iniciativa+"” evaluada. Esta queda como versión "+ver+" y vas a poder comparar las dos."];
@@ -2514,7 +2585,9 @@ async function revisar(){
 function guardar(){
   const i=S.expedientes.findIndex(e=>e.id===S.exp.id);
   if(i>=0)S.expedientes[i]=S.exp;else S.expedientes.unshift(S.exp);
-  guardarExp(S.exp);Fire.logEvento(S.exp.autor,"guardar_informe",S.exp.id);ir("exp");
+  guardarExp(S.exp);Fire.logEvento(S.exp.autor,"guardar_informe",S.exp.id);
+  if(S.colaPendiente&&S.colaPendiente.length){cargarSiguienteDeCola();return;}
+  ir("exp");
 }
 function sincronizar(){
   const i=S.expedientes.findIndex(e=>e.id===S.exp.id);
@@ -2578,6 +2651,21 @@ async function leerArchivo(f){
       let t="";for(let i=1;i<=doc.numPages;i++){const p=await doc.getPage(i);
         t+=(await p.getTextContent()).items.map(x=>x.str).join(" ")+"\n\n";}
       S.doc=t;S.docHtml="";
+    }else if(n.endsWith(".xlsx")||n.endsWith(".xls")){
+      if(!window.XLSX)throw new Error("lib");
+      const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});
+      const hoja=wb.Sheets[wb.SheetNames[0]];
+      const filas=XLSX.utils.sheet_to_json(hoja,{header:1,raw:false,defval:""});
+      const lista=listaDesdeFilas(filas);
+      if(!lista.length)throw new Error("tipo");
+      if(lista.length>1){
+        S.colaSeleccion=lista.map(i=>({...i,elegida:true}));
+        render();
+        const e2=$("#estadoArchivo");if(e2)e2.textContent="Encontré "+lista.length+" iniciativas — elige cuáles evaluar arriba.";
+        return;
+      }
+      S.doc=textoDesdeFila(lista[0]);S.docHtml="";
+      S.meta={iniciativa:lista[0].nombre||"",squad:lista[0].squad||"",autor:S.meta.autor};
     }else throw new Error("tipo");
     render();
     const e2=$("#estadoArchivo");if(e2)e2.textContent="Listo: "+f.name+" ("+S.doc.trim().length+" caracteres).";
