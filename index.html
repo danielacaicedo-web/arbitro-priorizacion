@@ -1291,7 +1291,11 @@ function borrarTodo(){
 const $=s=>document.querySelector(s);
 const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 function ir(v){if(v==="chat"&&!S.exp)return;S.vista=v;S.aviso="";render();}
-function set(o){Object.assign(S,o);render();}
+function set(o){
+  const avisoNuevo=Object.prototype.hasOwnProperty.call(o,"aviso")&&o.aviso&&o.aviso!==S.aviso;
+  Object.assign(S,o);render();
+  if(avisoNuevo)window.scrollTo({top:0,behavior:"smooth"});
+}
 
 /* ============================================================ ILUSTRACIONES
    Volumen suave, caucho mate: degradado radial descentrado, sombra difusa,
