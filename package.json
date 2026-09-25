@@ -4,12 +4,15 @@
   "private": true,
   "description": "Árbitro de priorización — Spin. MVP sobre Vercel + Firebase.",
   "scripts": {
-    "dev": "vercel dev"
+    "dev": "vercel dev",
+    "test": "node --test test/logica.test.js",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "firebase": "^11.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "vercel": "^37.0.0"
   }
 }
