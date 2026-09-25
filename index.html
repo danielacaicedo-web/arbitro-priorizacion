@@ -968,7 +968,7 @@ const NOMBRES={c1:"Alineación al negocio",c2:"Evidencia",c3:"Impacto medible",c
 function evaluarLocal(txt,otros){
   const fs=frases(txt), avisos=[];
   const en=contar(txt,INGLES), es=contar(txt,ESPANOL);
-  if(en>es&&en>4)avisos.push("Tu documento parece estar en inglés. Puedo leerlo, pero mis preguntas y el acta salen en español.");
+  if(en>es&&en>4)avisos.push("Tu iniciativa parece estar en inglés. Puedo leerla, pero mis preguntas y el informe salen en español.");
   const pistas=["problema","usuari","cliente","queremos","quisiera","se me ocurr","podriamos|podríamos","objetivo","m[ée]trica","kpi","fase","lanzar","producto","iniciativa","squad","flujo","pantalla","app\\b","notificaci","tarjeta","soporte","transaccion","problem","target user"]
     .filter(p=>new RegExp(p,"i").test(txt)).length;
   if(pistas<2)avisos.push("Esto no se parece mucho a una iniciativa de producto. Lo reviso igual, pero si te marco casi todo como faltante, seguramente el problema sea el texto y no tu idea.");
@@ -1074,7 +1074,7 @@ function reevaluarLocal(exp){
     const orden={ausente:0,"débil":1,sustentado:2};
     if(orden[sub.estado]>orden[c.estado]){
       cambios.push({criterio:c.nombre,de:c.estado,a:sub.estado,porque:sub.nota});
-      return{...c,estado:sub.estado,cita:corta(r),nota:sub.nota+" Sale de tu respuesta, no del documento."};
+      return{...c,estado:sub.estado,cita:corta(r),nota:sub.nota+" Sale de tu respuesta, no de lo que escribiste antes."};
     }
     if(orden[sub.estado]===orden[c.estado]&&c.estado!=="sustentado"){
       cambios.push({criterio:c.nombre,de:c.estado,a:c.estado,porque:"Respondiste, pero con lo mismo que ya estaba. "+sub.nota});
@@ -1092,7 +1092,7 @@ function responderLocal(pregunta,exp){
   if(cr&&/por qu[ée]|c[óo]mo|explica|no entiendo|de d[óo]nde/.test(q)){
     return "En "+cr.nombre.toLowerCase()+" te marqué "+cr.estado+". "+cr.nota+
       (cr.cita?" Me apoyé en esta frase tuya: “"+cr.cita+"”."
-             :" No encontré ninguna frase del documento en la que apoyarme, y esa es justamente la razón.")+
+             :" No encontré ninguna frase en lo que escribiste en la que apoyarme, y esa es justamente la razón.")+
       " Si quieres ver cómo se ve ese criterio bien resuelto, vuelve a la lectura: el ejemplo está debajo del criterio.";
   }
   if(cr)return "Sobre "+cr.nombre.toLowerCase()+": quedó "+cr.estado+". "+cr.nota+" Si crees que me equivoco, márcalo como desacuerdo y queda escrito en el acta junto a mi lectura.";
@@ -1137,6 +1137,7 @@ const NIVELES=[
   d:"Está en su etapa más temprana. Abajo te digo qué hace falta para que crezca."}
 ];
 function nivelDe(p){return NIVELES.find(n=>p>=n.min)||NIVELES[3];}
+const SQUADS=["Money Movement","Card Experience","Segment-led Solutions"];
 /* El ciclo manda sobre la calificación: una priorizada ya no se juzga por su puntaje */
 const CICLOS=[
  {k:"Borrador",c:"var(--muted)",bg:"var(--paper)",d:"Todavía la estás trabajando"},
@@ -1403,7 +1404,7 @@ function vInicio(){
   <div class="comofunciona">
     <div class="cf-h"><b>Cómo funciona</b><span>Tres pasos, menos de diez minutos</span></div>
     <div class="pasos">
-      <div class="paso">${ILUS.leer()}<i>Paso 1 · Lectura</i><b>Leo tu documento</b><span>Reviso los seis criterios que Spin usa para priorizar una iniciativa y te digo cuáles ya tienes, cuáles están a medias y cuáles faltan.</span></div>
+      <div class="paso">${ILUS.leer()}<i>Paso 1 · Lectura</i><b>Reviso tu iniciativa</b><span>Reviso los seis criterios que Spin usa para priorizar una iniciativa y te digo cuáles ya tienes, cuáles están a medias y cuáles faltan.</span></div>
       <div class="paso">${ILUS.preguntar()}<i>Paso 2 · Preguntas</i><b>Te pregunto lo que preguntará la mesa</b><span>Las preguntas clave para completar lo que falta. Respóndelas y tu iniciativa crece con ellas.</span></div>
       <div class="paso">${ILUS.acta()}<i>Paso 3 · Informe</i><b>Te entrego el informe</b><span>Calificación final, prioridad estimada y una página lista para llevar a la mesa, o para seguir trabajando.</span></div>
     </div>
@@ -1411,8 +1412,12 @@ function vInicio(){
 
   <div class="card">
     <div class="meta3">
-      <label>Iniciativa<input value="${esc(S.meta.iniciativa)}" placeholder="Se toma del documento si no la escribes" oninput="S.meta.iniciativa=this.value"></label>
-      <label>Squad<input value="${esc(S.meta.squad)}" placeholder="Card Experience" oninput="S.meta.squad=this.value"></label>
+      <label>Iniciativa<input value="${esc(S.meta.iniciativa)}" placeholder="Se toma de lo que escribas abajo si no la pones aquí" oninput="S.meta.iniciativa=this.value"></label>
+      <label>Squad<select onchange="S.meta.squad=this.value">
+        <option value="">Selecciona un squad</option>
+        ${SQUADS.map(s=>`<option value="${esc(s)}" ${S.meta.squad===s?"selected":""}>${esc(s)}</option>`).join("")}
+        ${S.meta.squad&&!SQUADS.includes(S.meta.squad)?`<option value="${esc(S.meta.squad)}" selected>${esc(S.meta.squad)}</option>`:""}
+      </select></label>
       <label>Responsable<input value="${esc(S.meta.autor)}" placeholder="Tu nombre" oninput="S.meta.autor=this.value"></label>
     </div>
     <label for="txt" style="font-weight:600;font-size:13.5px;display:block;margin:16px 0 8px">
@@ -1475,7 +1480,7 @@ function vChat(){
 
   if(S.fase==="leyendo"||!e.criterios){
     return `<div class="split"><div class="thread">
-      ${msg('<h3>Leyendo tu documento</h3><div class="typing"><span></span><span></span><span></span></div><p style="margin-top:10px;color:var(--muted)">Estoy revisando los seis criterios de Spin, y las frases tuyas en las que me pueda apoyar.</p>')}
+      ${msg('<h3>Revisando tu iniciativa</h3><div class="typing"><span></span><span></span><span></span></div><p style="margin-top:10px;color:var(--muted)">Estoy revisando los seis criterios de Spin, y las frases tuyas en las que me pueda apoyar.</p>')}
     </div>${docHTML()}</div>`;
   }
   const paso=e.paso||"lectura";
@@ -1521,7 +1526,9 @@ function vLectura(e,msg){
   if(e.noEvaluable){
     out+=`<section class="tarjeta"><h3>Necesito un poco más para poder ayudarte</h3>
       <p class="sub">Con esto no alcanzo a orientarte todavía. Cuéntame al menos:</p>
-      <ul class="lista">${e.minimos.map(m=>`<li>${m}</li>`).join("")}</ul></section>`;
+      <ul class="lista">${e.minimos.map(m=>`<li>${m}</li>`).join("")}</ul>
+      <button class="btn" style="margin-top:14px" onclick="nuevaVersion('${e.id}')">Editar y volver a intentar</button>
+    </section>`;
     return `${stepper()}<div class="split"><div class="flujo">${out}</div>${docHTML()}</div>`;
   }
 
@@ -1555,7 +1562,7 @@ function vLectura(e,msg){
   const n=(e.preguntas||[]).length;
   out+=`<button class="avanzar" onclick="irPaso('${n?"preguntas":"informe"}')">
     <div><span>Paso 2 de 3</span><b>${n?"Responder las "+n+" preguntas":"Ver el informe"}</b>
-    <em>${n?"Son las que te faltan para completar la iniciativa. Toma menos de cinco minutos.":"No tengo preguntas para este documento."}</em></div>
+    <em>${n?"Son las que te faltan para completar la iniciativa. Toma menos de cinco minutos.":"No tengo preguntas para esta iniciativa."}</em></div>
     <i>→</i></button>`;
 
   return `${stepper()}<div class="split"><div class="flujo">${out}</div>${docHTML()}</div>`;
@@ -1665,7 +1672,7 @@ function veredictoHTML(e,grande){
     </div>
     <div><b style="color:${n.c}">${n.t}</b>
     <span style="font-size:${grande?14.5:13}px;color:#4A4B58">${esc(e.lectura||n.d)}</span>
-    ${grande?`<small>${n.d} Esta calificación mide qué tan sustentado está el documento, no qué tan prioritaria es la iniciativa.</small>`:''}</div>
+    ${grande?`<small>${n.d} Esta calificación mide qué tan sustentada está la iniciativa, no qué tan prioritaria es.</small>`:''}</div>
   </div>`;
 }
 
@@ -1683,7 +1690,7 @@ function fichaHTML(e){
       <label>Alcance
         <div class="cx"><input type="number" min="0" max="100" value="${pr.alcance===null?"":pr.alcance}"
           oninput="setRice('alcance',this.value)"><span>% de usuarios</span></div>
-        <em>${pr.sugerido&&pr.sugerido.alcance?"detectado en tu documento, confírmalo":"no lo encontré en el documento"}</em></label>
+        <em>${pr.sugerido&&pr.sugerido.alcance?"detectado en lo que escribiste, confírmalo":"no lo encontré en lo que escribiste"}</em></label>
       <label>Impacto
         <select onchange="setRice('impacto',this.value)">
           <option value="">Elige</option>
@@ -1937,7 +1944,7 @@ function comoDoc(t){
 function docHTML(){
   return `<aside class="card doc">
     <div style="font-size:13.5px;font-weight:700">${esc(S.exp.nombre)}</div>
-    <div style="font-size:12px;color:var(--faint);margin:4px 0 12px">Tu documento, tal como lo entregaste. Para cambiarlo se crea una versión nueva.</div>
+    <div style="font-size:12px;color:var(--faint);margin:4px 0 12px">Tu iniciativa, tal como la entregaste. Para cambiarla se crea una versión nueva.</div>
     <div class="docfmt">${S.exp.prdHtml?S.exp.prdHtml:comoDoc(S.exp.prd)}</div></aside>`;
 }
 
@@ -1995,7 +2002,7 @@ function vExp(){
     };
     return `<div class="filtros">${FILTROS.map(chip).join("")}</div>
     <div class="filtros-grupo">
-      <span class="fg-label">Por calidad del documento (mientras sigue en Borrador)</span>
+      <span class="fg-label">Por calidad de la iniciativa (mientras sigue en Borrador)</span>
       <div class="filtros">${FILTROS_CALIDAD.map(chip).join("")}</div>
     </div>
     <div class="filtros-grupo">
@@ -2086,7 +2093,7 @@ function editarIni(idx,campo,valor){
   if(campo==="nombre"||campo==="objetivo")i.kw=kwDe(i.nombre,i.objetivo);
   guardarCorpusFn();
 }
-function borrarIni(idx){S.corpus.splice(idx,1);guardarCorpusFn();render();}
+function borrarIni(idx){alert("Quitar iniciativas del registro está deshabilitado para esta prueba. Más adelante quedará reservado para perfiles autorizados.");}
 function exportarCorpus(){
   const b=new Blob([JSON.stringify(S.corpus,null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="iniciativas-spin.json";a.click();
@@ -2094,11 +2101,44 @@ function exportarCorpus(){
 function filasDesdeCSV(txt){
   return txt.split(/\r?\n/).filter(Boolean).map(l=>l.split(/[;,\t]/).map(x=>x.trim().replace(/^"|"$/g,"")));
 }
+/* Reconoce encabezados reales de Spin (ej. "Equipo"→squad, "Proyecto"→iniciativa),
+   y busca la fila de encabezado entre las primeras filas en vez de asumir que es
+   la primera — los archivos reales suelen traer leyendas arriba (ej. "N/A = Despriorizado"). */
+const COL_PATRONES={
+  squad:/squad|equipo|team|c[ée]lula/i,
+  nombre:/proyecto|iniciativa|^nombre$|feature/i,
+  objetivo:/objetivo|impact/i,
+  estado:/estado|status|sizing/i,
+};
+function detectarColumnas(fila){
+  const mapa={};
+  fila.forEach((celda,i)=>{
+    const t=String(celda||"").trim();
+    if(!t)return;
+    for(const campo in COL_PATRONES){
+      if(mapa[campo]===undefined&&COL_PATRONES[campo].test(t))mapa[campo]=i;
+    }
+  });
+  return mapa;
+}
 function listaDesdeFilas(filas){
-  const cab=(filas[0]||[]).join(" ").toLowerCase();
-  const desde=/squad|iniciativa|nombre|objetivo/.test(cab)?1:0;
-  return filas.slice(desde).filter(c=>c.some(x=>String(x||"").trim())).map((c,n)=>
+  let mejorFila=-1,mejorMapa=null,mejorPuntaje=0;
+  for(let i=0;i<Math.min(filas.length,15);i++){
+    const mapa=detectarColumnas(filas[i]||[]);
+    const puntaje=(mapa.squad!==undefined?1:0)+(mapa.nombre!==undefined?1:0)+
+                  (mapa.objetivo!==undefined?1:0)+(mapa.estado!==undefined?1:0);
+    if(mapa.nombre!==undefined&&puntaje>mejorPuntaje){mejorFila=i;mejorMapa=mapa;mejorPuntaje=puntaje;}
+  }
+  /* Sin encabezado reconocible: se cae al comportamiento anterior (columnas por posición). */
+  if(mejorFila===-1)return filas.filter(c=>c.some(x=>String(x||"").trim())).map((c,n)=>
     ({id:"IN-"+(n+1),squad:c[0]||"",nombre:c[1]||"",objetivo:c[2]||"",estado:c[3]||"En definición",kw:kwDe(c[1]||"",c[2]||"")}));
+  const m=mejorMapa;
+  return filas.slice(mejorFila+1).filter(c=>c.some(x=>String(x||"").trim())).map((c,n)=>{
+    const nombre=m.nombre!==undefined?(c[m.nombre]||""):"";
+    const objetivo=m.objetivo!==undefined?(c[m.objetivo]||""):"";
+    return{id:"IN-"+(n+1),squad:m.squad!==undefined?(c[m.squad]||""):"",nombre,objetivo,
+      estado:(m.estado!==undefined&&c[m.estado])||"En definición",kw:kwDe(nombre,objetivo)};
+  }).filter(i=>i.nombre.trim());
 }
 function importarCorpus(f){
   if(!f)return;
@@ -2186,8 +2226,8 @@ function pintarBusqueda(){
   render();
   if(foco){const i=document.querySelector(".buscar");if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}}
 }
-function verFicha2(id){S.viendo=S.expedientes.find(e=>e.id===id);if(S.viendo){S.volverA="exp";set({vista:"ver"});}}
-function verFicha(id){S.volverA="ini";S.viendo=S.expedientes.find(e=>e.id===id);if(S.viendo)set({vista:"ver"});}
+function verFicha2(id){S.viendo=S.expedientes.find(e=>e.id===id);if(S.viendo){S.volverA="exp";set({vista:"ver",aviso:""});}}
+function verFicha(id){S.volverA="ini";S.viendo=S.expedientes.find(e=>e.id===id);if(S.viendo)set({vista:"ver",aviso:""});}
 function vVer(){
   const e=S.viendo; if(!e)return vExp();
   const st=estadoDe(e), r=riceDe(e.prioridad);
@@ -2231,7 +2271,7 @@ function vVer(){
 function docVerHTML(e){
   return `<aside class="card doc">
     <div style="font-size:13.5px;font-weight:700">${esc(e.nombre)}</div>
-    <div style="font-size:12px;color:var(--faint);margin:4px 0 12px">El documento tal como lo entregaron.</div>
+    <div style="font-size:12px;color:var(--faint);margin:4px 0 12px">La iniciativa tal como la entregaron.</div>
     <div class="docfmt">${e.prdHtml?e.prdHtml:comoDoc(e.prd)}</div></aside>`;
 }
 function vIniciativas(){
@@ -2507,7 +2547,7 @@ function ordenados(){
 function nuevaVersion(id){
   const e=S.expedientes.find(x=>x.id===id);if(!e)return;
   S.doc=e.prd; S.meta={iniciativa:e.iniciativa||"",squad:e.squad||"",autor:e.autor||""};
-  set({vista:"inicio",aviso:"Cargué el documento de “"+(e.iniciativa||e.nombre)+"”. Edítalo y vuelve a pasarlo: se guarda como versión "+((e.version||1)+1)+" y podrás compararlas."});
+  set({vista:"inicio",aviso:"Cargué la iniciativa “"+(e.iniciativa||e.nombre)+"”. Edítala y vuelve a pasarla: se guarda como versión "+((e.version||1)+1)+" y podrás compararlas."});
 }
 function abrir(id){S.exp=S.expedientes.find(e=>e.id===id);if(!S.exp.paso)S.exp.paso=S.exp.cerrado?"informe":"lectura";ir("chat");}
 function renombrar(id,v){const e=S.expedientes.find(x=>x.id===id);if(e){e.nombre=v;guardarExp(e);}}

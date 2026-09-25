@@ -105,3 +105,45 @@ Mandar una notificación push con el monto y el comercio apenas se registra el m
   assert.equal(r.criterios.length, 6);
   assert.ok(r.criterios.every(c => ["sustentado", "débil", "ausente"].includes(c.estado)));
 });
+
+test("listaDesdeFilas: reconoce encabezados reales de Spin (Equipo/Proyecto), saltando leyendas", () => {
+  const filas = [
+    ["N/A = Despriorizado o pausado", "", ""],
+    ["PRD + Definition + Research + Discovery", "", ""],
+    ["Development", "", ""],
+    ["🚀", "Launch", ""],
+    [], // fila vacía, como separador
+    ["Equipo", "Épica", "Proyecto", "PRD", "Sizing", "Owner"],
+    ["Money movements", "Digital", "Link de pago", "PRD", "M", "Andrea Chacón"],
+    ["Money movements", "Físico", "Hub de comisiones", "PRD", "L", "Victor Suazo"],
+    ["Segment-led solutions", "Savings", "Apartados Individual", "PRD", "L", "Mars/Jaf"],
+    ["", "", "", "", "", ""], // fila vacía en medio de los datos
+  ];
+  const lista = L.listaDesdeFilas(filas);
+  assert.equal(lista.length, 3);
+  assert.equal(lista[0].squad, "Money movements");
+  assert.equal(lista[0].nombre, "Link de pago");
+  assert.equal(lista[2].squad, "Segment-led solutions");
+  assert.equal(lista[2].nombre, "Apartados Individual");
+});
+
+test("listaDesdeFilas: sin encabezado reconocible, cae a columnas por posición (comportamiento anterior)", () => {
+  const filas = [
+    ["Card Experience", "Alertas de consumo", "Reducir tickets", "Priorizada"],
+  ];
+  const lista = L.listaDesdeFilas(filas);
+  assert.equal(lista.length, 1);
+  assert.equal(lista[0].squad, "Card Experience");
+  assert.equal(lista[0].nombre, "Alertas de consumo");
+});
+
+test("listaDesdeFilas: formato simple (squad/iniciativa/objetivo/estado) sigue funcionando", () => {
+  const filas = [
+    ["squad", "iniciativa", "objetivo", "estado"],
+    ["Money Movement", "Límites dinámicos", "Reducir fraude", "En definición"],
+  ];
+  const lista = L.listaDesdeFilas(filas);
+  assert.equal(lista.length, 1);
+  assert.equal(lista[0].nombre, "Límites dinámicos");
+  assert.equal(lista[0].estado, "En definición");
+});

@@ -14,7 +14,11 @@ service cloud.firestore {
                     && request.resource.data.autor is string
                     && request.resource.data.autor.size() > 0;
       allow update: if true;
-      allow delete: if false;
+      // El borrado real está deshabilitado a propósito — en la UI se simula con un
+      // modal ("deshabilitado para esta prueba"). Única excepción: los registros que
+      // crea el smoke test automatizado (marcados con este nombre exacto), para que
+      // el propio test se limpie solo y no ensucie el tablero real en cada corrida.
+      allow delete: if resource.data.autor == 'ZZ_TEST_AUTOMATIZADO';
     }
 
     // Documentos únicos compartidos: el listado manual de otros squads (meta/corpus)
