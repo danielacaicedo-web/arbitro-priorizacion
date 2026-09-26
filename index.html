@@ -1428,9 +1428,9 @@ function vInicio(){
       </select></label>
     </div>
 
-    <label for="campo-descripcion" style="font-weight:600;font-size:13.5px;display:block;margin:18px 0 4px">Descripción / cómo funciona
+    <label for="campo-descripcion" style="font-weight:600;font-size:13.5px;display:block;margin:18px 0 4px">Descripción / cómo funciona <span style="font-weight:500;color:var(--naranja)">(obligatorio)</span>
       <em style="display:block;font-weight:500;font-style:normal;font-size:12px;color:var(--faint);margin-top:2px">Qué problema resuelve, para quién, y qué haría el producto. Ej: “Si el usuario está en una tienda que recibe muchos SPEI IN o P2P IN, le recomendamos transferir a esa cuenta.”</em></label>
-    <textarea id="campo-descripcion" rows="3" placeholder="Opcional, pero entre mejor lo cuentes, mejor te oriento"
+    <textarea id="campo-descripcion" rows="3" placeholder="Es lo mínimo que necesito para poder orientarte"
       oninput="actualizarCampo('descripcion',this.value)">${esc(S.campos.descripcion)}</textarea>
 
     <label for="campo-impacto" style="font-weight:600;font-size:13.5px;display:block;margin:14px 0 4px">Impacto estimado
@@ -2717,6 +2717,7 @@ function votar(id,v){
 }
 
 async function empezar(){
+  if(!(S.campos.descripcion||"").trim()){set({aviso:"Descripción / cómo funciona es obligatorio — cuéntame qué problema resuelve, para quién, y qué haría el producto antes de evaluar."});return;}
   const t=(S.doc||"").trim();
   if(t.length<110){set({aviso:"Con tan poco no alcanzo a orientarte. Cuéntame al menos qué problema viste, a quién le pasa y qué se te ocurrió hacer."});return;}
   const hoy=new Date().toISOString().slice(0,10);
