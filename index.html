@@ -1412,12 +1412,13 @@ function vInicio(){
       <label>Responsable<input value="${esc(S.meta.autor)}" placeholder="Tu nombre" oninput="S.meta.autor=this.value"></label>
     </div>
 
-    <label style="font-weight:600;font-size:13.5px;display:block;margin:18px 0 6px">¿Es algo nuevo o es una mejora?</label>
-    <select style="max-width:280px" onchange="S.campos.tipo=this.value">
-      <option value="">Selecciona</option>
-      <option value="Nuevo" ${S.campos.tipo==="Nuevo"?"selected":""}>Algo nuevo</option>
-      <option value="Mejora" ${S.campos.tipo==="Mejora"?"selected":""}>Mejora a algo que ya existe</option>
-    </select>
+    <div class="meta3" style="margin-top:18px;max-width:280px">
+      <label>¿Es algo nuevo o es una mejora?<select onchange="S.campos.tipo=this.value">
+        <option value="">Selecciona</option>
+        <option value="Nuevo" ${S.campos.tipo==="Nuevo"?"selected":""}>Algo nuevo</option>
+        <option value="Mejora" ${S.campos.tipo==="Mejora"?"selected":""}>Mejora a algo que ya existe</option>
+      </select></label>
+    </div>
 
     <label for="campo-descripcion" style="font-weight:600;font-size:13.5px;display:block;margin:18px 0 4px">Descripción / cómo funciona
       <em style="display:block;font-weight:500;font-style:normal;font-size:12px;color:var(--faint);margin-top:2px">Qué problema resuelve, para quién, y qué haría el producto. Ej: “Si el usuario está en una tienda que recibe muchos SPEI IN o P2P IN, le recomendamos transferir a esa cuenta.”</em></label>
