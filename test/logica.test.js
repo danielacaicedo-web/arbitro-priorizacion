@@ -160,20 +160,6 @@ test("listaDesdeFilas: formato simple (squad/iniciativa/objetivo/estado) sigue f
   assert.equal(lista[0].estado, "En definición");
 });
 
-test("filasDesdeCSV: respeta comas dentro de comillas (no parte la celda en dos)", () => {
-  const txt = 'squad,iniciativa,objetivo,estado\n' +
-    '"Money Movement","Límites dinámicos","Reduce fraude, phishing y robo","En definición"';
-  const filas = L.filasDesdeCSV(txt);
-  assert.equal(filas.length, 2);
-  assert.equal(filas[1].join("|"), ["Money Movement", "Límites dinámicos", "Reduce fraude, phishing y robo", "En definición"].join("|"));
-});
-
-test("filasDesdeCSV: detecta punto y coma como delimitador si es el que predomina", () => {
-  const txt = 'squad;iniciativa;objetivo;estado\nMoney Movement;Límites dinámicos;Reducir fraude;En definición';
-  const filas = L.filasDesdeCSV(txt);
-  assert.equal(filas[1].join("|"), ["Money Movement", "Límites dinámicos", "Reducir fraude", "En definición"].join("|"));
-});
-
 test("textoDesdeCampos/camposDesdeTexto: hacen round-trip del formulario estructurado", () => {
   const campos = { tipo: "Nuevo", descripcion: "Explica el mecanismo.", impacto: "55,616 usuarios.", esfuerzo: "Mediano.", riesgos: "" };
   const texto = L.textoDesdeCampos(campos);

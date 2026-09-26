@@ -673,10 +673,6 @@ const Fire={
     db.collection("expedientes").doc(exp.id).set(limpio(exp),{merge:true})
       .then(()=>{Fire.ok=true;}).catch(()=>{Fire.ok=false;render();});
   },
-  guardarCorpus(items){
-    db.collection("meta").doc("corpus").set(limpio({items:items||[]}))
-      .then(()=>{Fire.ok=true;}).catch(()=>{Fire.ok=false;render();});
-  },
   guardarPodio(ids){
     db.collection("meta").doc("podio").set(limpio({orden:ids||[]}))
       .then(()=>{Fire.ok=true;}).catch(()=>{Fire.ok=false;render();});
@@ -705,21 +701,6 @@ const Fire={
    Archivo único. Funciona sin conexión con el motor local.
    Si pegas una API key de Anthropic, evalúa con el modelo.
    ============================================================ */
-
-const CORPUS_EJEMPLO=[
- {id:"MM-01",squad:"Money Movements",nombre:"Transferencias programadas",objetivo:"Subir frecuencia de uso mensual",estado:"En construcción",kw:["transferencia","programad","recurrente"]},
- {id:"MM-02",squad:"Money Movements",nombre:"Alertas de envío fallido",objetivo:"Reducir contactos a soporte por pagos",estado:"En diseño",kw:["envío fallido","alerta","notificaci","push"]},
- {id:"MM-03",squad:"Money Movements",nombre:"Límites dinámicos por perfil de riesgo",objetivo:"Reducir fricción en montos altos",estado:"Priorizada",kw:["aumento de límite","perfil de riesgo","límite de transferencia"]},
- {id:"MM-04",squad:"Money Movements",nombre:"Historial unificado de movimientos",objetivo:"Reducir contactos a soporte",estado:"En definición",kw:["historial unificado","consulta de movimientos"]},
- {id:"CX-01",squad:"Card Experience",nombre:"Alertas de consumo en tiempo real",objetivo:"Subir activación de tarjeta",estado:"En definición",kw:["consumo","tarjeta","alerta"]},
- {id:"CX-02",squad:"Card Experience",nombre:"Congelar y descongelar tarjeta",objetivo:"Reducir reposiciones",estado:"Priorizada",kw:["congelar","bloquear la tarjeta"]},
- {id:"CX-03",squad:"Card Experience",nombre:"Rediseño del detalle de movimiento",objetivo:"Reducir contactos a soporte",estado:"En diseño",kw:["detalle del movimiento","comercio"]},
- {id:"CX-04",squad:"Card Experience",nombre:"Notificaciones push de corte",objetivo:"Subir recurrencia de uso",estado:"Despriorizada",kw:["corte","recordatorio","fecha de pago"]},
- {id:"SL-01",squad:"Segment-led",nombre:"Onboarding diferenciado por segmento",objetivo:"Subir conversión de registro",estado:"En construcción",kw:["onboarding","registro"]},
- {id:"SL-02",squad:"Segment-led",nombre:"Beneficios segmentados por comportamiento",objetivo:"Subir retención a 90 días",estado:"En definición",kw:["beneficio","segmento","recompensa"]},
- {id:"SL-03",squad:"Segment-led",nombre:"Reactivación de usuarios inactivos",objetivo:"Subir usuarios activos mensuales",estado:"Priorizada",kw:["inactiv","reactiva","campaña"]},
- {id:"SL-04",squad:"Segment-led",nombre:"Encuesta in-app de satisfacción",objetivo:"Levantar voz del cliente",estado:"En diseño",kw:["encuesta","satisfacción"]}
-];
 
 const SEM={
  verde:{t:"Sustentada",c:"var(--morado)",c2:"#9B6BFF",bg:"var(--verdeSoft)",d:"Está lista para que la mesa la discuta."},
@@ -973,11 +954,11 @@ function evaluarLocal(txt,otros){
 
   const deps=[];
   const cab=txt.slice(0,180).toLowerCase();
-  /* el registro manual más todo lo que ya se evaluó en la herramienta */
-  const universo=corpusActual().concat(
-    (otros||[]).filter(o=>o.iniciativa&&o.criterios)
+  /* todo lo que ya se evaluó en la herramienta (el registro manual se quitó: nunca
+     se usó, y esto se mantiene sin necesitar que nadie lo cargue — ver backlog) */
+  const universo=(otros||[]).filter(o=>o.iniciativa&&o.criterios)
       .map(o=>({id:o.id,squad:o.squad||"otro squad",nombre:o.iniciativa,objetivo:"",kw:[],evaluada:true}))
-      .filter((o,x,a)=>a.findIndex(y=>norm(y.nombre)===norm(o.nombre))===x));
+      .filter((o,x,a)=>a.findIndex(y=>norm(y.nombre)===norm(o.nombre))===x);
   universo.forEach(i=>{
     if(cab.includes(i.nombre.toLowerCase().slice(0,16)))return;
     const kws=señasDe(i);
@@ -993,7 +974,7 @@ function evaluarLocal(txt,otros){
 
   return{admisibilidad,minimos,noEvaluable:minimos.length>=2,criterios,avisos,
     dependencias:deps.slice(0,3),
-    cobertura:corpusActual().length?"Solo alcanzo a ver las iniciativas que están cargadas. Si hay algo más en marcha, no lo tengo.":"Todavía no hay iniciativas cargadas, así que no puedo decirte si esto choca con lo que hace otro squad."};
+    cobertura:"Solo comparo contra iniciativas que ya pasaron por el agente. Si algo está en marcha en otro squad y todavía no se evaluó aquí, no lo veo."};
 }
 
 function preguntasDe(criterios){
@@ -1277,7 +1258,6 @@ let S={verLey:false,sq:"",podio:null,arrastrando:null,busca:"",vsq:"todas",viend
 function corpusActual(){return S.corpus||[];}
 /* Guarda el expediente indicado (o S.exp si no se pasa ninguno) en Firestore. */
 function guardarExp(exp){Fire.guardarExpediente(exp||S.exp);}
-function guardarCorpusFn(){Fire.guardarCorpus(S.corpus);}
 function guardarPodioFn(){Fire.guardarPodio(S.podio);}
 function norm(s){return (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9 ]/g,"").trim();}
 function nombreExp(meta,fecha,version){
@@ -1773,16 +1753,15 @@ function vLectura(e,msg){
 
   /* 4. ¿alguien más está en esto? */
   const hayCruce=e.dependencias.length>0;
-  const sinDatos=!hayCruce&&corpusActual().length===0&&S.expedientes.filter(x=>x.criterios&&x.id!==e.id).length===0;
+  const sinDatos=!hayCruce&&S.expedientes.filter(x=>x.criterios&&x.id!==e.id).length===0;
   out+=`<section class="similar ${hayCruce?"si":sinDatos?"nd":"no"}">
     <i>${hayCruce?"!":sinDatos?"?":"✓"}</i>
     <div>
       <b>${hayCruce?"Hay alguien más en algo parecido":sinDatos?"Todavía no puedo decirte si alguien más está en esto":"Nadie más está en algo parecido"}</b>
       ${hayCruce?e.dependencias.map(d=>`<p><strong>${esc(d.iniciativa)}</strong> <span class="sq">${d.squad}${d.evaluada?" · ya evaluada":""}</span> — ${esc(d.nota)}</p>`).join("")
-        :sinDatos?`<p>No tengo con qué comparar todavía. Carga lo que hace cada squad, o pasa más iniciativas por aquí: cada una que evalúes mejora esta detección.</p>`
-                :`<p>Comparé contra todo lo que hay cargado y contra las iniciativas que ya pasaron por aquí. Ninguna resuelve lo mismo.</p>`}
+        :sinDatos?`<p>Todavía no hay otras iniciativas evaluadas con qué comparar. Cada una que pase por aquí mejora esta detección.</p>`
+                :`<p>Comparé contra las iniciativas que ya pasaron por aquí. Ninguna resuelve lo mismo.</p>`}
       ${sinDatos?"":`<em>${esc(e.cobertura||"")}</em>`}
-      ${corpusActual().length?"":`<button class="btn sec mini" onclick="S.volverExp=S.exp.id;ir('ini')">Cargar las iniciativas de los squads</button>`}
     </div>
   </section>`;
 
@@ -2388,64 +2367,6 @@ function kwDe(nombre,objetivo){
   return [...new Set(w.map(raiz))].filter(Boolean).slice(0,6);
 }
 function señasDe(i){return (i.kw&&i.kw.length)?i.kw:kwDe(i.nombre,i.objetivo);}
-function nuevaIniciativa(){
-  S.corpus.push({id:"IN-"+(S.corpus.length+1),squad:"",nombre:"",objetivo:"",estado:"En definición",kw:[]});
-  guardarCorpusFn();render();
-}
-function editarIni(idx,campo,valor){
-  const i=S.corpus[idx];if(!i)return;
-  i[campo]=valor;
-  if(campo==="nombre"||campo==="objetivo")i.kw=kwDe(i.nombre,i.objetivo);
-  guardarCorpusFn();
-}
-function borrarIni(idx){
-  if(!confirm("¿Estás segura que quieres quitar esta iniciativa del registro?"))return;
-  S.corpus.splice(idx,1);guardarCorpusFn();render();
-}
-function exportarCorpus(){
-  const filas=[["squad","iniciativa","objetivo","estado"]]
-    .concat(S.corpus.map(i=>[i.squad||"",i.nombre||"",i.objetivo||"",i.estado||""]));
-  const ws=XLSX.utils.aoa_to_sheet(filas);
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,"Iniciativas");
-  XLSX.writeFile(wb,"iniciativas-spin.xlsx");
-}
-/* Detecta el delimitador real (coma, punto y coma o tab) mirando el encabezado,
-   y respeta comillas — antes, una celda como "Reduce fraude, phishing y robo"
-   se partía mal en dos columnas al reimportarla. */
-function detectarDelimitadorCSV(linea){
-  const candidatos=[",",";","\t"];
-  let mejor=",",max=-1;
-  for(const d of candidatos){
-    const n=linea.split(d).length-1;
-    if(n>max){max=n;mejor=d;}
-  }
-  return mejor;
-}
-function parseLineaCSV(linea,delim){
-  const out=[];let cur="",enComillas=false;
-  for(let i=0;i<linea.length;i++){
-    const ch=linea[i];
-    if(enComillas){
-      if(ch==='"'){
-        if(linea[i+1]==='"'){cur+='"';i++;}
-        else enComillas=false;
-      }else cur+=ch;
-    }else{
-      if(ch==='"')enComillas=true;
-      else if(ch===delim){out.push(cur.trim());cur="";}
-      else cur+=ch;
-    }
-  }
-  out.push(cur.trim());
-  return out;
-}
-function filasDesdeCSV(txt){
-  const lineas=txt.split(/\r?\n/).filter(l=>l.length);
-  if(!lineas.length)return[];
-  const delim=detectarDelimitadorCSV(lineas[0]);
-  return lineas.map(l=>parseLineaCSV(l,delim));
-}
 /* Reconoce encabezados reales de Spin (ej. "Equipo"→squad, "Proyecto"→iniciativa),
    y busca la fila de encabezado entre las primeras filas en vez de asumir que es
    la primera — los archivos reales suelen traer leyendas arriba (ej. "N/A = Despriorizado"). */
@@ -2485,38 +2406,6 @@ function listaDesdeFilas(filas){
       estado:(m.estado!==undefined&&c[m.estado])||"En definición",kw:kwDe(nombre,objetivo)};
   }).filter(i=>i.nombre.trim());
 }
-function importarCorpus(f){
-  if(!f)return;
-  const nombre=f.name.toLowerCase();
-  const r=new FileReader();
-  const avisoError=()=>set({aviso:"No pude leer ese archivo. Necesito una lista con columnas squad, iniciativa, objetivo y estado — en Excel (.xlsx) o CSV. Si tiene varias hojas o un formato distinto, exporta solo la hoja con el listado como CSV e inténtalo de nuevo. Importa un archivo a la vez: cada import reemplaza la lista completa."});
-  const guardar=lista=>{
-    if(!lista||!lista.length)throw 0;
-    if(S.corpus.length&&!confirm("Esto va a reemplazar las "+S.corpus.length+" iniciativas actuales por las "+lista.length+" del archivo nuevo. ¿Seguro?"))return;
-    S.corpus=lista;guardarCorpusFn();
-    set({aviso:"Cargué "+lista.length+" iniciativas. A partir de ahora los cruces se buscan contra estas."});
-  };
-  if(nombre.endsWith(".xlsx")||nombre.endsWith(".xls")){
-    r.onload=()=>{
-      try{
-        const wb=XLSX.read(r.result,{type:"array"});
-        const hoja=wb.Sheets[wb.SheetNames[0]];
-        const filas=XLSX.utils.sheet_to_json(hoja,{header:1,raw:false,defval:""});
-        guardar(listaDesdeFilas(filas));
-      }catch(e){avisoError();}
-    };
-    r.readAsArrayBuffer(f);
-    return;
-  }
-  if(!nombre.endsWith(".csv")){avisoError();return;}
-  r.onload=()=>{
-    try{
-      guardar(listaDesdeFilas(filasDesdeCSV(r.result)));
-    }catch(e){avisoError();}
-  };
-  r.readAsText(f);
-}
-
 const VISTAS_SQ=[
  {k:"todas",t:"Todas"},
  {k:"idea",t:"En construcción",d:e=>(e.ciclo||"Borrador")==="Borrador"},
@@ -2611,46 +2500,14 @@ function docVerHTML(e){
   return panelDocHTML(e);
 }
 function vIniciativas(){
-  const n=S.corpus.length;
   return `${S.volverExp?`<div class="avisos"><div>Tenías una evaluación en curso. <button class="btn link mini" onclick="const id=S.volverExp;S.volverExp=null;abrir(id)">← Volver a tu evaluación</button></div></div>`:""}
   <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
     <h1 class="tituloV" style="font-size:24px;letter-spacing:-.02em">Iniciativas por squad</h1>
     </div>
   <p style="font-size:14px;color:var(--muted);max-width:66ch;margin:10px 0 0">
-    Esta pantalla tiene dos partes: primero, el registro que ustedes cargan a mano con lo que cada squad
-    tiene en marcha (sirve para que detecte cruces entre iniciativas); después, la lista de las iniciativas
-    que ya pasaron por el agente, solo para consultarlas.</p>
-  <h2 class="subt" style="margin-top:24px">El registro que cargas a mano</h2>
-  <p class="sub" style="margin-bottom:14px">Lo que cada squad tiene en marcha. Es lo único que me permite avisarte que tu iniciativa
-    se solapa con algo que ya está haciendo otro squad, o que depende de ello. Si está vacío evalúo igual,
-    pero sobre esa parte no te puedo decir nada.</p>
-  <div style="display:flex;gap:12px;margin:18px 0;flex-wrap:wrap;align-items:center">
-    <button class="btn" onclick="nuevaIniciativa()">Añadir iniciativa</button>
-    <label class="btn sec" style="cursor:pointer">Importar una lista
-      <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importarCorpus(this.files[0])"></label>
-    ${n?`<button class="btn link" onclick="exportarCorpus()">Exportar</button>`:""}
-  </div>
-  <p style="font-size:12px;color:var(--faint);margin:-10px 0 14px">Importa un archivo a la vez: cada import reemplaza la lista completa, no la mezcla con lo que ya tenías.</p>
-  ${n?`<div class="tabla">
-    <div class="fila cab"><span>Squad</span><span>Iniciativa</span><span>Objetivo de negocio</span><span>Estado</span><span></span></div>
-    ${S.corpus.map((i,x)=>`<div class="fila">
-      <input value="${esc(i.squad)}" placeholder="Squad" onchange="editarIni(${x},'squad',this.value)">
-      <input value="${esc(i.nombre)}" placeholder="Nombre de la iniciativa" onchange="editarIni(${x},'nombre',this.value)">
-      <input value="${esc(i.objetivo)}" placeholder="A qué objetivo responde" onchange="editarIni(${x},'objetivo',this.value)">
-      <input value="${esc(i.estado)}" placeholder="Estado" onchange="editarIni(${x},'estado',this.value)">
-      <button class="btn link" onclick="borrarIni(${x})" aria-label="Quitar">Quitar</button>
-    </div>`).join("")}
-  </div>`:`<div class="vacio">
-    ${ILUS.iniciativas()}
-    <h3>Todavía no hay iniciativas cargadas</h3>
-    <p>Sin esto puedo evaluar tu iniciativa igual, pero no puedo decirte si choca con lo que está haciendo otro squad.
-    Pide a cada PM su lista de iniciativas activas con el objetivo al que responden, y cárgala aquí.</p>
-    <p style="font-size:13px">Puedes cargarla desde tu Excel de siempre (.xlsx), o desde CSV — con cuatro columnas: squad, nombre, objetivo y estado.</p>
-  </div>`}
-  <p style="font-size:12.5px;color:var(--faint);margin-top:20px;max-width:64ch">
-    ${Fire.ok?"Esta lista es compartida: la ve cualquiera que entre a la herramienta."
-             :"No estoy logrando conectar con la base de datos ahora mismo. Exporta la lista para no perderla."}</p>
-  <div style="margin-top:32px;border-top:1px solid var(--line);padding-top:24px">${evaluadasHTML()}</div>`;
+    Las iniciativas que ya pasaron por el agente, agrupadas por squad, con su calificación y si ya están
+    priorizadas. Se llena sola con cada evaluación — no hay nada que cargar a mano.</p>
+  ${evaluadasHTML()}`;
 }
 
 /* ---------- Acta: versión completa y exportable ---------- */
