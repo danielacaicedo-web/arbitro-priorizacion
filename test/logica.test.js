@@ -8,24 +8,24 @@ function criterio(id, estado) {
   return { id, estado };
 }
 
-test("puntajeDe: los 6 criterios sustentados dan 100", () => {
-  const criterios = ["c1", "c2", "c3", "c4", "c5", "c6"].map(id => criterio(id, "sustentado"));
+test("puntajeDe: los 4 criterios sustentados dan 100", () => {
+  const criterios = ["c1", "c2", "c3", "c4"].map(id => criterio(id, "sustentado"));
   assert.equal(L.puntajeDe(criterios, []), 100);
 });
 
 test("puntajeDe: todo ausente da 0", () => {
-  const criterios = ["c1", "c2", "c3", "c4", "c5", "c6"].map(id => criterio(id, "ausente"));
+  const criterios = ["c1", "c2", "c3", "c4"].map(id => criterio(id, "ausente"));
   assert.equal(L.puntajeDe(criterios, []), 0);
 });
 
 test("puntajeDe: pondera cada criterio según su peso (PESOS)", () => {
-  // Solo "Impacto medible" (c3, peso 25) sustentado, el resto ausente.
-  const criterios = ["c1", "c2", "c3", "c4", "c5", "c6"].map(id => criterio(id, id === "c3" ? "sustentado" : "ausente"));
-  assert.equal(L.puntajeDe(criterios, []), 25);
+  // Solo "Claridad de la propuesta" (c1, peso 35) sustentado, el resto ausente.
+  const criterios = ["c1", "c2", "c3", "c4"].map(id => criterio(id, id === "c1" ? "sustentado" : "ausente"));
+  assert.equal(L.puntajeDe(criterios, []), 35);
 });
 
 test("puntajeDe: 'mejora' presente suma hasta 8 puntos extra, sin pasar de 100", () => {
-  const criterios = ["c1", "c2", "c3", "c4", "c5", "c6"].map(id => criterio(id, "sustentado"));
+  const criterios = ["c1", "c2", "c3", "c4"].map(id => criterio(id, "sustentado"));
   const admisibilidad = [
     { nivel: "mejora", estado: "declarado" },
     { nivel: "mejora", estado: "declarado" },
@@ -89,7 +89,7 @@ test("evaluarLocal: texto vacío/genérico queda no_evaluable", () => {
   assert.equal(r.noEvaluable, true);
 });
 
-test("evaluarLocal: siempre devuelve los 6 criterios + usabilidad", () => {
+test("evaluarLocal: siempre devuelve los 4 criterios", () => {
   const texto = `Alertas de consumo en tiempo real
 Squad: Card Experience - Payments
 
@@ -102,8 +102,20 @@ Los usuarios se enteran de sus consumos hasta el corte. Eso genera frustración 
 3. Solución
 Mandar una notificación push con el monto y el comercio apenas se registra el movimiento.`;
   const r = L.evaluarLocal(texto, []);
-  assert.equal(r.criterios.length, 6);
+  assert.equal(r.criterios.length, 4);
   assert.ok(r.criterios.every(c => ["sustentado", "débil", "ausente"].includes(c.estado)));
+});
+
+test("evaluarLocal: una iniciativa real de nivel Excel (sin PRD) no queda toda en 'ausente'", () => {
+  // Ejemplo real de Money Movements, tal como vive antes de tener PRD.
+  const texto = `Sugerencia por geolocalización
+Si el usuario esta en una tienda que en esa geolocalización recibe muchos SPEI IN o P2P IN y abre su app le recomendamos directamente la transferencia a esa cuenta.
+Tani va a la tienda de Mari, abre SbO, la app por atrás detecta que en esa geolocalización la cuenta X de Maria tiene muchos SPEI IN y P2P IN. Entonces le sugiere a Tani un modal en el home para transferirle a Maria.
+Población SbO que hoy exhibe este patrón: 55,616. Tasa de trx no generadas: 10.11%. Estimado trx: 5,623.`;
+  const r = L.evaluarLocal(texto, []);
+  assert.equal(r.noEvaluable, false);
+  const noAusentes = r.criterios.filter(c => c.estado !== "ausente").length;
+  assert.ok(noAusentes >= 2, "esperaba al menos 2 de 4 criterios no-ausentes, dado que sí trae mecanismo e impacto");
 });
 
 test("listaDesdeFilas: reconoce encabezados reales de Spin (Equipo/Proyecto), saltando leyendas", () => {

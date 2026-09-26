@@ -772,29 +772,28 @@ const SENAL={
   instrumenta:/evento|instrumentar|tracking|anal[íi]tica|capturar|dashboard|tablero/i,
   tecnico:/api\b|latencia|core\b|backend|servicio de|integraci[óo]n|deeplink|modelo\b/i,
   competencia:/competencia|competidor|ning[úu]n banco|otros bancos|fintech|diferenciador|frente a la competencia|benchmark|mercado/i,
-  existente:/ya (existe|intentamos|hicimos|hay|se intent|contamos)|hoy ya|(modelo|funcionalidad|flujo|motor|herramienta)\s[\wáéíóú\s]{0,20}actual|versi[óo]n anterior|alternativa|evaluamos|consideramos|en vez de/i
+  existente:/ya (existe|intentamos|hicimos|hay|se intent|contamos)|hoy ya|(modelo|funcionalidad|flujo|motor|herramienta)\s[\wáéíóú\s]{0,20}actual|versi[óo]n anterior|alternativa|evaluamos|consideramos|en vez de/i,
+  solucion:/soluci[óo]n|propuesta|consiste en|la funcionalidad|el flujo propuesto|vamos a (construir|hacer|mandar|mostrar|generar|crear)|se le (sugiere|muestra|env[íi]a|recomienda)|detecta que|le (recomendamos|sugerimos)/i,
+  esfuerzo:/esfuerzo (ti|t[ée]cnico|de desarrollo)?|sizing|complejidad (alta|media|baja|t[ée]cnica)|f[áa]cil de construir|dif[íi]cil de construir|semanas? de (desarrollo|trabajo)|\bsprint\b|tama[ñn]o (grande|chico|mediano|peque[ñn]o)/i,
+  riesgoOdependencia:/riesgo|depende de|dependencia|requiere (un )?research|research previo|no soporta|bloque(a|o)|complejidad t[ée]cnica|podr[íi]a (complicar|fallar)|es posible que esto requiera/i
 };
 const INGLES=/\b(the|and|of|with|for|user|users|problem|goal|metric|we will|should|feature|release)\b/gi;
 const ESPANOL=/\b(el|la|los|las|de|que|para|con|usuario|problema|objetivo|semana|vamos|queremos)\b/gi;
 
 /* ---- Banco fijo, en el idioma del negocio ---- */
 const BANCO={
- c1:["¿A qué objetivo de negocio le pega esto y cómo se vería en los números de Spin?","¿A cuántos MAUs les pasa esto hoy? Necesito el porcentaje o el volumen, no “muchos usuarios”."],
- c2:["¿Qué análisis, dashboard o piloto respalda que esto pasa? Dime la cifra y de cuándo es.","¿Esto sale de datos, de un mandato o de una intuición del equipo? ¿Qué te hace estar seguro?"],
- c3:["¿Cuál es el KPI primario, con qué target y en cuánto tiempo?","¿Cuánto vale hoy ese número y dónde se va a medir? Sin línea base no vas a poder demostrar que mejoró."],
- c4:["¿Cómo sale esto: en fases, con piloto, por región? ¿Y qué entra en la primera?","Si la primera fase no da los números, ¿qué haces? ¿Sigues, ajustas o lo apagas?"],
- c5:["¿Qué necesitas de Data, Legal, Riesgos, del core o de OXXO para que esto salga?","¿Qué evento hay que capturar para poder medir esto, y ya existe o hay que crearlo?"],
- c6:["¿Qué hace hoy la competencia con esto? ¿Esto nos diferencia o nos empareja?","¿Ya existe algo en Spin que resuelva parte de esto? ¿Qué pasó con ello?"]
+ c1:["¿Qué es esto exactamente y cómo funcionaría? Cuéntamelo como se lo explicarías a alguien que no sabe nada del proyecto.","Ya cuentas algo de la propuesta, pero ¿cómo funcionaría paso a paso? Dame el mecanismo completo."],
+ c2:["¿A cuánta gente o cuántas transacciones le pega esto? Dame una cifra, aunque sea aproximada.","Ya hay una cifra, pero ¿a qué representa exactamente — población, transacciones, porcentaje?"],
+ c3:["¿Qué tan grande es construir esto? Aunque sea un tamaño relativo (chico, mediano, grande) o una fase.","Mencionas algo técnico, pero ¿qué tan grande es el esfuerzo de construirlo?"],
+ c4:["¿Hay algún riesgo conocido, o dependes de otro equipo o squad para que esto salga? Si no hay, dilo y seguimos.","Nombras a alguien más, pero ¿qué riesgo o dependencia implica exactamente?"]
 };
 
 /* ---- Cómo se ve un criterio bien resuelto, con el estándar de Spin ---- */
 const EJEMPLO={
- c1:"El cash in en OXXO es un flujo central: el 54% de los MAUs deposita en tienda. Esta iniciativa le pega directo a transaccionalidad y al volumen de depósitos.",
- c2:"El análisis de la región Pacífico encendida no mostró uplift: las plazas piloto replicaron el comportamiento de las plazas sin el beneficio. Lo decimos aunque no nos favorezca.",
- c3:"KPI primario: transacciones de cash in entre 10pm y 12am en tiendas habilitadas. Target optimista 9%, conservador 5%, medido en dashboard a 6 meses.",
- c4:"Roll-out en tres fases: Pacífico para validar operación, luego dos regiones más, después nacional. Si la fase 1 no mueve el número, no seguimos.",
- c5:"Data instrumenta el evento de depósito nocturno, Riesgos valida el límite por horario y OXXO tiene que habilitar las tiendas. Los tres ya están enterados.",
- c6:"Ningún banco ni fintech competidor ha extendido este horario: todos operan hasta las 10pm. Es un diferenciador sostenible, no un empate."
+ c1:"Si el usuario está en una tienda que en esa geolocalización recibe muchos SPEI IN o P2P IN y abre su app, le recomendamos directamente la transferencia a esa cuenta. La app detecta el patrón por atrás y sugiere un modal en el home.",
+ c2:"El patrón se detecta hoy en 55,616 usuarios de SbO (población mensual), con una tasa de transacciones no generadas de 10.11% — estimado de 5,623 transacciones adicionales al mes.",
+ c3:"Fase 1: componente en home y deeplink. Fase 2: asistente dentro de la app. Esfuerzo TI medio, ya existen los modelos NBA e Inflow en los que apoyarse.",
+ c4:"Depende de que Riesgos valide el patrón de detección, y es posible que requiera un research previo porque el equipo de tarjetas levantó un riesgo similar en otro flujo."
 };
 
 /* ---- PRDs de ejemplo ---- */
@@ -888,85 +887,46 @@ function mejor(fs,re,extra){
 }
 function contar(t,re){return (t.match(re)||[]).length;}
 
-/* ---- Un evaluador por criterio, con el estándar de los PRDs de Spin ---- */
+/* ---- Un evaluador por criterio, calibrado contra iniciativas reales de Spin
+   en etapa temprana (antes de que exista un PRD) — no contra PRDs terminados. ---- */
 const EVAL={
- /* 1. Alineación: a qué objetivo de negocio le pega y cuánto pesa */
+ /* 1. Claridad de la propuesta: se entiende qué es y cómo funcionaría */
  c1(t,fs){
-  const obj=hay(fs,OBJETIVO);
-  if(!obj)return{estado:"ausente",cita:"",nota:"Todavía no dice a qué objetivo de negocio le pega ni qué mueve en Spin."};
-  const tam=SENAL.tamano.test(t), mej=SENAL.mejora.test(t);
-  if(tam&&mej)return{estado:"sustentado",cita:corta(mejor(fs,SENAL.tamano,OBJETIVO)),nota:"Dice a qué objetivo le pega, cuánto pesa hoy y cuánto espera moverlo."};
-  if(tam)return{estado:"sustentado",cita:corta(mejor(fs,SENAL.tamano,OBJETIVO)),nota:"Nombra el objetivo y el peso del flujo en MAUs o volumen."};
-  if(mej)return{estado:"débil",cita:corta(mejor(fs,OBJETIVO,SENAL.mejora)),nota:"Hay objetivo y meta, pero no dice qué porcentaje de MAUs o qué volumen toca."};
-  return{estado:"débil",cita:corta(obj),nota:"Menciona el objetivo sin decir cuánto pesa hoy ese flujo."};
+  const sol=hay(fs,SENAL.solucion);
+  if(!sol)return{estado:"ausente",cita:"",nota:"Todavía no dice qué es esto ni cómo funcionaría en la práctica."};
+  if(sol.length>50)return{estado:"sustentado",cita:corta(sol),nota:"Se entiende qué es la iniciativa y cómo funciona."};
+  return{estado:"débil",cita:corta(sol),nota:"Se menciona la propuesta, pero falta explicar cómo funcionaría."};
  },
- /* 2. Evidencia: con qué se sostiene que el problema existe */
+ /* 2. Impacto estimado: una cifra que dimensione el impacto esperado */
  c2(t,fs){
-  if(SENAL.mandato.test(t)){
-    const cita=corta(mejor(fs,SENAL.mandato));
-    if(SENAL.desplaza.test(t))return{estado:"sustentado",cita,nota:"Entra por mandato y dice qué desplaza. Eso basta.",origen:"mandato"};
-    return{estado:"débil",cita,nota:"Entra por mandato. No lo cuestiono, pero falta decir qué desplaza.",origen:"mandato"};
-  }
-  let evc=fs.find(s=>SENAL.evidencia.test(s)&&SENAL.cifra.test(s));
-  const ev=hay(fs,SENAL.evidencia);
-  if(!evc&&ev){ /* la cifra puede estar cerca, no en la misma frase */
-    const pos=t.indexOf(ev.slice(0,40));
-    if(pos>=0&&SENAL.cifra.test(t.slice(Math.max(0,pos-260),pos+420)))evc=ev;
-  }
-  if(evc)return{estado:"sustentado",cita:corta(evc),nota:"Trae análisis con cifra, no una impresión del equipo.",origen:"evidencia"};
-  if(ev)return{estado:"débil",cita:corta(ev),nota:"Cita una fuente sin número ni periodo. ¿Cuántos casos y de cuándo?",origen:"evidencia"};
-  if(SENAL.cifra.test(t))return{estado:"débil",cita:corta(mejor(fs,SENAL.cifra)),nota:"Hay cifras, pero no dice de qué análisis o dashboard salen.",origen:"dato suelto"};
-  if(SENAL.intuicion.test(t))return{estado:"débil",cita:corta(mejor(fs,SENAL.intuicion)),nota:"Es una intuición del equipo. Puede ser correcta, pero no es evidencia.",origen:"supuesto"};
-  return{estado:"ausente",cita:"",nota:"Todavía no dice con qué datos se sostiene que esto pasa.",origen:"sin declarar"};
+  const cifraFuerte=hay(fs,SENAL.tamano);
+  if(cifraFuerte)return{estado:"sustentado",cita:corta(mejor(fs,SENAL.tamano)),nota:"Trae una cifra que dimensiona el impacto: población, porcentaje o volumen."};
+  const cifra=hay(fs,SENAL.cifra);
+  if(cifra)return{estado:"débil",cita:corta(cifra),nota:"Hay una cifra, pero no queda claro a cuánta gente o volumen representa."};
+  return{estado:"ausente",cita:"",nota:"Todavía no hay una cifra que dimensione el impacto esperado."};
  },
- /* 3. Impacto: hipótesis, KPI primario, target y medición */
+ /* 3. Esfuerzo estimado: una idea de alto nivel de qué tan grande es construirlo */
  c3(t,fs){
-  if(SENAL.vanidad.test(t)&&!SENAL.mejora.test(t))
-    return{estado:"débil",cita:corta(mejor(fs,SENAL.vanidad)),nota:"Esa métrica sube aunque el producto no sirva. Necesito una que mida valor."};
-  const k=hay(fs,SENAL.kpi)||hay(fs,SENAL.mejora);
-  if(!k)return{estado:"ausente",cita:"",nota:"Todavía no hay un número que diga si esto funcionó."};
-  const hip=SENAL.hipotesis.test(t), num=SENAL.mejora.test(t), med=SENAL.medicion.test(t), lb=SENAL.base.test(t);
-  const cita=corta(mejor(fs,SENAL.kpi,SENAL.mejora));
-  if(num&&med&&hip)return{estado:"sustentado",cita,nota:lb?"Hipótesis, KPI con target, medición declarada y línea base.":"Hipótesis, KPI con target y dónde se mide. Falta el valor de hoy."};
-  if(num&&med)return{estado:"sustentado",cita,nota:"KPI con target y medición declarada. Sin hipótesis explícita no se sabe qué se está probando."};
-  if(num)return{estado:"débil",cita,nota:"Hay target, pero no dice dónde se va a medir ni cuánto vale hoy."};
-  return{estado:"débil",cita:corta(k),nota:"Nombra qué va a medir, pero sin target no es una meta."};
+  const e=hay(fs,SENAL.esfuerzo);
+  if(e)return{estado:"sustentado",cita:corta(e),nota:"Da una idea de alto nivel de qué tan grande es construirlo."};
+  if(SENAL.tecnico.test(t))return{estado:"débil",cita:corta(mejor(fs,SENAL.tecnico)),nota:"Menciona algo técnico, pero no un tamaño o esfuerzo relativo."};
+  return{estado:"ausente",cita:"",nota:"Todavía no hay ninguna noción de qué tan grande es construir esto."};
  },
- /* 4. Plan de entrega: fases, piloto y qué pasa si la primera no da */
+ /* 4. Riesgos y dependencias: qué podría complicar la ejecución, si aplica */
  c4(t,fs){
-  const f=hay(fs,SENAL.fases);
-  const noEsPlazo=/(m[áa]s de|menos de|hace|[úu]ltim|primer|cada|durante|antig[üu]edad de)\s+\w*\s*(\d+|una?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce)?\s*(semanas?|meses|d[íi]as)/i;
-  const plazo=fs.find(s=>SENAL.plazo.test(s)&&!noEsPlazo.test(s)&&!/problema|dejan de|abandonan/i.test(s));
-  if(!f&&!plazo&&SENAL.vago.test(t))return{estado:"ausente",cita:corta(mejor(fs,SENAL.vago)),nota:"“Cuando haya espacio” no es un plan. La entrega se decide, no se espera."};
-  if(!f&&!plazo)return{estado:"ausente",cita:"",nota:"Todavía no dice cómo saldría: ni fases, ni piloto, ni fecha."};
-  if(f&&SENAL.recorte.test(t))return{estado:"sustentado",cita:corta(f,22),nota:"Sale por fases y dice qué pasa si la primera no da los números."};
-  if(f)return{estado:"sustentado",cita:corta(f,22),nota:"Hay plan de entrega por fases. Falta decir qué pasa si la primera no rinde."};
-  return{estado:"débil",cita:corta(plazo),nota:"Hay una fecha, pero no un plan de salida por fases ni un piloto."};
- },
- /* 5. Dependencias: quién más tiene que entrar y qué hay que instrumentar */
- c5(t,fs){
-  const a=hay(fs,SENAL.areas), inst=SENAL.instrumenta.test(t);
-  if(a&&inst)return{estado:"sustentado",cita:corta(mejor(fs,SENAL.areas,SENAL.instrumenta)),nota:"Nombra las áreas que entran y qué hay que instrumentar."};
-  if(a)return{estado:"débil",cita:corta(a),nota:"Nombra áreas, pero no dice qué evento hay que capturar para medir."};
-  if(inst)return{estado:"débil",cita:corta(mejor(fs,SENAL.instrumenta)),nota:"Habla de medición, pero no dice con quién se construye."};
-  if(SENAL.tecnico.test(t))return{estado:"débil",cita:corta(mejor(fs,SENAL.tecnico)),nota:"Menciona una pieza técnica, pero no a las áreas que tienen que entrar."};
-  return{estado:"ausente",cita:"",nota:"Todavía no menciona a nadie fuera del squad. En Spin casi nunca es cierto."};
- },
- /* 6. Diferenciación: frente al mercado y frente a lo que ya existe en Spin */
- c6(t,fs){
-  const comp=hay(fs,SENAL.competencia), ex=hay(fs,SENAL.existente);
-  if(comp&&ex)return{estado:"sustentado",cita:corta(mejor(fs,SENAL.competencia)),nota:"Se compara con el mercado y con lo que Spin ya tiene."};
-  if(comp)return{estado:"sustentado",cita:corta(comp),nota:"Dice qué hace la competencia y por qué esto diferencia."};
-  if(ex)return{estado:"débil",cita:corta(ex),nota:"Revisa lo que ya existe en Spin, pero no mira al mercado."};
-  return{estado:"ausente",cita:"",nota:"Todavía no dice qué hace la competencia ni si ya existe algo parecido en Spin."};
+  const r=hay(fs,SENAL.riesgoOdependencia), a=hay(fs,SENAL.areas);
+  if(r&&a)return{estado:"sustentado",cita:corta(mejor(fs,SENAL.riesgoOdependencia)),nota:"Nombra un riesgo o dependencia concreta, y con quién."};
+  if(r)return{estado:"sustentado",cita:corta(r),nota:"Menciona un riesgo o algo que podría complicar la ejecución."};
+  if(a)return{estado:"débil",cita:corta(a),nota:"Nombra otra área o squad, pero no dice qué riesgo o dependencia implica."};
+  return{estado:"débil",cita:"",nota:"No es obligatorio, pero si ya sabes de algún riesgo o dependencia, decirlo aquí suma."};
  }
 };
-const RIESGO={c1:"valor",c2:"valor",c3:"viabilidad de negocio",c4:"factibilidad",c5:"factibilidad",c6:"viabilidad de negocio",cu:"usabilidad"};
+const RIESGO={c1:"valor",c2:"viabilidad de negocio",c3:"factibilidad",c4:"factibilidad",cu:"usabilidad"};
 const USABILIDAD=[
  "Cuando esto salga, ¿el usuario va a entender qué pasó sin que nadie se lo explique?",
  "¿Dónde aparece esto en el recorrido del usuario, y qué tiene que hacer distinto a lo que hace hoy?"
 ];
-const NOMBRES={c1:"Alineación al negocio",c2:"Evidencia",c3:"Impacto medible",c4:"Plan de entrega",c5:"Dependencias",c6:"Diferenciación"};
+const NOMBRES={c1:"Claridad de la propuesta",c2:"Impacto estimado",c3:"Esfuerzo estimado",c4:"Riesgos y dependencias"};
 
 function evaluarLocal(txt,otros){
   const fs=frases(txt), avisos=[];
@@ -992,7 +952,7 @@ function evaluarLocal(txt,otros){
   if(!/usuario|usuaria|cliente|tarjetahabiente|segmento|target user|spinner|persona/i.test(txt))minimos.push("quién lo tiene");
   if(!OBJETIVO.test(txt))minimos.push("el objetivo de negocio");
 
-  const criterios=["c1","c2","c3","c4","c5","c6"].map(id=>{
+  const criterios=["c1","c2","c3","c4"].map(id=>{
     const r=EVAL[id](txt,fs);
     return{id,nombre:NOMBRES[id],estado:r.estado,cita:r.cita,nota:r.nota,origen:r.origen};
   });
@@ -1055,7 +1015,7 @@ function semaforoDe(cr,noEval){
 }
 function lecturaDe(cr,sem){
   const fl=cr.filter(c=>c.estado!=="sustentado").map(c=>c.nombre.toLowerCase());
-  if(sem==="verde")return"Los seis criterios quedaron sustentados con frases tuyas.";
+  if(sem==="verde")return"Los cuatro criterios quedaron sustentados con frases tuyas.";
   if(sem==="rojo"&&fl.length>=4)return"Es lo normal a esta altura. Te falta definir "+fl.slice(0,3).join(", ")+" y algo más.";
   return"Lo que falta está en "+fl.slice(0,3).join(", ")+".";
 }
@@ -1102,24 +1062,24 @@ function responderLocal(pregunta,exp){
   if(/sem[áa]foro|color|rojo|amarillo|verde|morado|naranja/.test(q))
     return "El semáforo mide qué tan sólida está la sustentación, no qué tan prioritaria es la iniciativa. Morado quiere decir que está lista para que la mesa la discuta; naranja, que falta información que ya te nombré; gris, que todavía no puedo evaluarla.";
   if(/vara|criterio|c[óo]mo eval[úu]as|de d[óo]nde sacas/.test(q))
-    return "Mido seis cosas: a qué objetivo de negocio le pega y cuánto pesa, con qué evidencia se sostiene, qué KPI mueve y con qué target, cómo sale por fases, quién más tiene que entrar, y si diferencia frente al mercado. La vara está calibrada contra iniciativas reales de Spin, no contra una plantilla genérica.";
+    return "Mido cuatro cosas: qué tan clara es la propuesta y cómo funciona, qué tanto impacto estimado tiene, qué tan grande es construirla, y qué riesgos o dependencias implica. La vara está calibrada contra iniciativas reales de Spin en esta etapa temprana, no contra un PRD terminado.";
   if(/qui[ée]n eres|qu[ée] haces|para qu[ée] sirves/.test(q))
     return "Leo tu iniciativa antes de que la lleves a la mesa, te digo qué le falta citando tus propias frases y te hago las preguntas que te van a hacer allá. No decido nada.";
   if(/ayuda|c[óo]mo lo arreglo|qu[ée] escribo|escr[íi]belo/.test(q))
     return "No te lo escribo: si yo redacto tu iniciativa, dejo de poder auditarla. Lo que sí hago es mostrarte un ejemplo de cómo se ve ese criterio bien resuelto, para que veas el nivel de concreción que hace falta. Vuelve a la lectura y lo encuentras debajo del criterio.";
-  return "No sé responder eso con lo que tengo. Lo que sí puedo: explicarte por qué marqué cualquiera de los seis criterios —escribe el nombre del criterio— o por qué el semáforo quedó como quedó.";
+  return "No sé responder eso con lo que tengo. Lo que sí puedo: explicarte por qué marqué cualquiera de los cuatro criterios —escribe el nombre del criterio— o por qué el semáforo quedó como quedó.";
 }
 
 /* ============================================================ CALIFICACIÓN Y PRIORIDAD
    Dos ejes distintos, a propósito:
-   1. Solidez (0-100): qué tan sustentado está el PRD. Es lo que el agente sabe medir.
+   1. Solidez (0-100): qué tan sustentada está la iniciativa. Es lo que el agente sabe medir.
    2. Prioridad estimada (RICE): con los números que el PM declaró, nunca inventados.
    El agente no decide: pone los dos ejes sobre la mesa.
    ============================================================ */
 
-/* Peso de cada criterio. Suma 100. Impacto y evidencia pesan más porque son
-   lo que más se repite como vacío en los PRDs revisados de Spin. */
-const PESOS={c1:20,c2:20,c3:25,c4:15,c5:10,c6:10};
+/* Peso de cada criterio. Suma 100. Claridad e impacto pesan más porque son
+   lo primero que hace falta para poder comparar iniciativas entre sí. */
+const PESOS={c1:35,c2:30,c3:20,c4:15};
 const VALOR={sustentado:1,"débil":0.5,ausente:0};
 
 function puntajeDe(criterios,admisibilidad){
@@ -1229,13 +1189,6 @@ function cuadranteDe(p,r){
   return{t:"Todavía no",d:"Ni la sustentación ni los números la sostienen. No gastes tiempo de mesa en esto aún."};
 }
 
-/* ============================================================ MODELO (opcional) */
-const SYSTEM=`Eres un auditor de iniciativas de producto en Spin. Evalúas qué tan sólida está la sustentación de una iniciativa. NO decides si debe hacerse ni la priorizas.
-Para cada uno de los seis criterios (Alineación, Origen, Impacto medible, Apetito, Dependencias, Repetición) devuelve estado (sustentado, débil o ausente), la FRASE TEXTUAL del documento que lo respalda y una nota de máximo 12 palabras.
-REGLA DURA: sin frase que citar, el criterio no puede quedar sustentado.
-Si faltan problema, usuario u objetivo de negocio, marca no_evaluable.
-Hablas en español neutro y cercano, sin tecnicismos. Eres exigente, no complaciente.
-Respondes SIEMPRE solo con JSON válido, sin markdown.`;
 
 /* Evaluación vía función serverless (Vercel → OpenRouter). La key nunca vive en el cliente. */
 async function evaluarConModelo(txt){
@@ -1424,7 +1377,7 @@ function vInicio(){
   <div class="comofunciona">
     <div class="cf-h"><b>Cómo funciona</b><span>Tres pasos, menos de diez minutos</span></div>
     <div class="pasos">
-      <div class="paso">${ILUS.leer()}<i>Paso 1 · Lectura</i><b>Reviso tu iniciativa</b><span>Reviso los seis criterios que Spin usa para priorizar una iniciativa y te digo cuáles ya tienes, cuáles están a medias y cuáles faltan.</span></div>
+      <div class="paso">${ILUS.leer()}<i>Paso 1 · Lectura</i><b>Reviso tu iniciativa</b><span>Reviso los cuatro criterios que Spin usa para priorizar una iniciativa y te digo cuáles ya tienes, cuáles están a medias y cuáles faltan.</span></div>
       <div class="paso">${ILUS.preguntar()}<i>Paso 2 · Preguntas</i><b>Te pregunto lo que preguntará la mesa</b><span>Las preguntas clave para completar lo que falta. Respóndelas y tu iniciativa crece con ellas.</span></div>
       <div class="paso">${ILUS.acta()}<i>Paso 3 · Informe</i><b>Te entrego el informe</b><span>Calificación final, prioridad estimada y una página lista para llevar a la mesa, o para seguir trabajando.</span></div>
     </div>
@@ -1544,7 +1497,7 @@ function vChat(){
 
   if(S.fase==="leyendo"||!e.criterios){
     return `<div class="split"><div class="thread">
-      ${msg('<h3>Revisando tu iniciativa</h3><div class="typing"><span></span><span></span><span></span></div><p style="margin-top:10px;color:var(--muted)">Estoy revisando los seis criterios de Spin, y las frases tuyas en las que me pueda apoyar.</p>')}
+      ${msg('<h3>Revisando tu iniciativa</h3><div class="typing"><span></span><span></span><span></span></div><p style="margin-top:10px;color:var(--muted)">Estoy revisando los cuatro criterios de Spin, y las frases tuyas en las que me pueda apoyar.</p>')}
     </div>${docHTML()}</div>`;
   }
   const paso=e.paso||"lectura";
@@ -1599,7 +1552,7 @@ function vLectura(e,msg){
   /* 2. prácticas que suman puntos extra (no bajan la calificación si faltan) */
   out+=nivelHTML(e,"mejora","Prácticas que suman puntos extra","No son obligatorias ni bajan la calificación si faltan. Si ya las tienes, suman hasta 8 puntos.");
 
-  /* 3. los seis criterios */
+  /* 3. los cuatro criterios */
   out+=`<section class="tarjeta">
     <div class="th"><h3>Cómo quedó cada criterio</h3></div>
     <p class="sub">Cada juicio va con la frase tuya en la que me apoyé. Si no encuentro una frase, el criterio no puede quedar sustentado.
@@ -1967,8 +1920,7 @@ function leyendaHTML(){
     ${S.verLey?`<div class="ejes">
       <div>
         <b>Calificación · 0 a 100</b>
-        <p>Sale de los seis criterios, pesados así: alineación al negocio 20, evidencia 20, impacto medible 25,
-        plan de entrega 15, dependencias 10, diferenciación 10.</p>
+        <p>Sale de los cuatro criterios, pesados así: claridad de la propuesta 35, impacto estimado 30, esfuerzo estimado 20, riesgos y dependencias 15.</p>
         ${NIVELES.map(n=>`<div class="nv"><span style="background:${n.c}"></span><b>${n.t}</b> ${n.min>0?n.min+" o más":"menos de 35"}</div>`).join("")}
       </div>
       <div>
@@ -2169,10 +2121,16 @@ function editarIni(idx,campo,valor){
   if(campo==="nombre"||campo==="objetivo")i.kw=kwDe(i.nombre,i.objetivo);
   guardarCorpusFn();
 }
-function borrarIni(idx){alert("Quitar iniciativas del registro está deshabilitado para esta prueba. Más adelante quedará reservado para perfiles autorizados.");}
+function borrarIni(idx){
+  if(!confirm("¿Estás segura que quieres quitar esta iniciativa del registro?"))return;
+  S.corpus.splice(idx,1);guardarCorpusFn();render();
+}
 function exportarCorpus(){
-  const b=new Blob([JSON.stringify(S.corpus,null,2)],{type:"application/json"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="iniciativas-spin.json";a.click();
+  const filas=[["squad","iniciativa","objetivo","estado"]]
+    .concat(S.corpus.map(i=>[i.squad||"",i.nombre||"",i.objetivo||"",i.estado||""]));
+  const csv=filas.map(f=>f.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  const b=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="iniciativas-spin.csv";a.click();
 }
 function filasDesdeCSV(txt){
   return txt.split(/\r?\n/).filter(Boolean).map(l=>l.split(/[;,\t]/).map(x=>x.trim().replace(/^"|"$/g,"")));
@@ -2220,7 +2178,7 @@ function importarCorpus(f){
   if(!f)return;
   const nombre=f.name.toLowerCase();
   const r=new FileReader();
-  const avisoError=()=>set({aviso:"No pude leer ese archivo. Necesito una lista con columnas squad, iniciativa, objetivo y estado — en Excel (.xlsx), CSV o JSON. Si tiene varias hojas o un formato distinto, exporta solo la hoja con el listado como CSV e inténtalo de nuevo. Importa un archivo a la vez: cada import reemplaza la lista completa."});
+  const avisoError=()=>set({aviso:"No pude leer ese archivo. Necesito una lista con columnas squad, iniciativa, objetivo y estado — en Excel (.xlsx) o CSV. Si tiene varias hojas o un formato distinto, exporta solo la hoja con el listado como CSV e inténtalo de nuevo. Importa un archivo a la vez: cada import reemplaza la lista completa."});
   const guardar=lista=>{
     if(!lista||!lista.length)throw 0;
     if(S.corpus.length&&!confirm("Esto va a reemplazar las "+S.corpus.length+" iniciativas actuales por las "+lista.length+" del archivo nuevo. ¿Seguro?"))return;
@@ -2239,17 +2197,10 @@ function importarCorpus(f){
     r.readAsArrayBuffer(f);
     return;
   }
+  if(!nombre.endsWith(".csv")){avisoError();return;}
   r.onload=()=>{
     try{
-      if(nombre.endsWith(".csv")){
-        guardar(listaDesdeFilas(filasDesdeCSV(r.result)));
-      }else{
-        let lista=JSON.parse(r.result);
-        if(!Array.isArray(lista))throw 0;
-        lista=lista.map((i,n)=>({id:i.id||"IN-"+(n+1),squad:i.squad||"",nombre:i.nombre||i.name||"",
-          objetivo:i.objetivo||i.objective||"",estado:i.estado||"En definición",kw:i.kw||kwDe(i.nombre||i.name||"",i.objetivo||"")}));
-        guardar(lista);
-      }
+      guardar(listaDesdeFilas(filasDesdeCSV(r.result)));
     }catch(e){avisoError();}
   };
   r.readAsText(f);
@@ -2359,12 +2310,12 @@ function vIniciativas(){
     que ya pasaron por el agente, solo para consultarlas.</p>
   <h2 class="subt" style="margin-top:24px">El registro que cargas a mano</h2>
   <p class="sub" style="margin-bottom:14px">Lo que cada squad tiene en marcha. Es lo único que me permite avisarte que tu iniciativa
-    se solapa con algo que ya está haciendo otro equipo, o que depende de ello. Si está vacío evalúo igual,
+    se solapa con algo que ya está haciendo otro squad, o que depende de ello. Si está vacío evalúo igual,
     pero sobre esa parte no te puedo decir nada.</p>
   <div style="display:flex;gap:12px;margin:18px 0;flex-wrap:wrap;align-items:center">
     <button class="btn" onclick="nuevaIniciativa()">Añadir iniciativa</button>
     <label class="btn sec" style="cursor:pointer">Importar una lista
-      <input type="file" accept=".xlsx,.xls,.csv,.json" style="display:none" onchange="importarCorpus(this.files[0])"></label>
+      <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importarCorpus(this.files[0])"></label>
     ${n?`<button class="btn link" onclick="exportarCorpus()">Exportar</button>`:""}
   </div>
   <p style="font-size:12px;color:var(--faint);margin:-10px 0 14px">Importa un archivo a la vez: cada import reemplaza la lista completa, no la mezcla con lo que ya tenías.</p>
@@ -2382,7 +2333,7 @@ function vIniciativas(){
     <h3>Todavía no hay iniciativas cargadas</h3>
     <p>Sin esto puedo evaluar tu iniciativa igual, pero no puedo decirte si choca con lo que está haciendo otro squad.
     Pide a cada PM su lista de iniciativas activas con el objetivo al que responden, y cárgala aquí.</p>
-    <p style="font-size:13px">Puedes cargarla desde tu Excel de siempre (.xlsx), o desde CSV/JSON — con cuatro columnas: squad, nombre, objetivo y estado.</p>
+    <p style="font-size:13px">Puedes cargarla desde tu Excel de siempre (.xlsx), o desde CSV — con cuatro columnas: squad, nombre, objetivo y estado.</p>
   </div>`}
   <p style="font-size:12.5px;color:var(--faint);margin-top:20px;max-width:64ch">
     ${Fire.ok?"Esta lista es compartida: la ve cualquiera que entre a la herramienta."
