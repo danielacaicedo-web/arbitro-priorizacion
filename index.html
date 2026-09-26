@@ -2128,12 +2128,46 @@ function borrarIni(idx){
 function exportarCorpus(){
   const filas=[["squad","iniciativa","objetivo","estado"]]
     .concat(S.corpus.map(i=>[i.squad||"",i.nombre||"",i.objetivo||"",i.estado||""]));
-  const csv=filas.map(f=>f.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\r\n");
-  const b=new Blob([csv],{type:"text/csv;charset=utf-8"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="iniciativas-spin.csv";a.click();
+  const ws=XLSX.utils.aoa_to_sheet(filas);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Iniciativas");
+  XLSX.writeFile(wb,"iniciativas-spin.xlsx");
+}
+/* Detecta el delimitador real (coma, punto y coma o tab) mirando el encabezado,
+   y respeta comillas — antes, una celda como "Reduce fraude, phishing y robo"
+   se partía mal en dos columnas al reimportarla. */
+function detectarDelimitadorCSV(linea){
+  const candidatos=[",",";","\t"];
+  let mejor=",",max=-1;
+  for(const d of candidatos){
+    const n=linea.split(d).length-1;
+    if(n>max){max=n;mejor=d;}
+  }
+  return mejor;
+}
+function parseLineaCSV(linea,delim){
+  const out=[];let cur="",enComillas=false;
+  for(let i=0;i<linea.length;i++){
+    const ch=linea[i];
+    if(enComillas){
+      if(ch==='"'){
+        if(linea[i+1]==='"'){cur+='"';i++;}
+        else enComillas=false;
+      }else cur+=ch;
+    }else{
+      if(ch==='"')enComillas=true;
+      else if(ch===delim){out.push(cur.trim());cur="";}
+      else cur+=ch;
+    }
+  }
+  out.push(cur.trim());
+  return out;
 }
 function filasDesdeCSV(txt){
-  return txt.split(/\r?\n/).filter(Boolean).map(l=>l.split(/[;,\t]/).map(x=>x.trim().replace(/^"|"$/g,"")));
+  const lineas=txt.split(/\r?\n/).filter(l=>l.length);
+  if(!lineas.length)return[];
+  const delim=detectarDelimitadorCSV(lineas[0]);
+  return lineas.map(l=>parseLineaCSV(l,delim));
 }
 /* Reconoce encabezados reales de Spin (ej. "Equipo"→squad, "Proyecto"→iniciativa),
    y busca la fila de encabezado entre las primeras filas en vez de asumir que es
