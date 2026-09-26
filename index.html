@@ -305,9 +305,10 @@ nav button.on{background:linear-gradient(135deg,#FFFFFF,#F7F2FF)}
 .nivel .nn{font-size:12.5px;color:var(--faint);margin-top:4px;padding-left:12px}
 
 
-.marcador{width:64px;height:64px;border-radius:50%;border:3px solid;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:0 0 64px;background:#fff}
-.marcador b{font-family:var(--display);font-size:22px;line-height:1}
-.marcador span{font-size:9.5px;color:var(--faint);margin-top:1px}
+.marcador{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:0 0 64px;padding:4px}
+.marcador-in{width:100%;height:100%;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.marcador-in b{font-family:var(--display);font-size:22px;line-height:1}
+.marcador-in span{font-size:9.5px;color:var(--faint);margin-top:1px}
 .ficha{border:1px solid var(--line);border-radius:var(--rs);padding:16px 18px;background:linear-gradient(180deg,#FCFAFF,#fff)}
 .ficha .fh{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
 .ficha .fh b{font-family:var(--display);font-size:15.5px;display:block;color:var(--tinta)}
@@ -774,7 +775,7 @@ const SENAL={
   tecnico:/api\b|latencia|core\b|backend|servicio de|integraci[óo]n|deeplink|modelo\b/i,
   competencia:/competencia|competidor|ning[úu]n banco|otros bancos|fintech|diferenciador|frente a la competencia|benchmark|mercado/i,
   existente:/ya (existe|intentamos|hicimos|hay|se intent|contamos)|hoy ya|(modelo|funcionalidad|flujo|motor|herramienta)\s[\wáéíóú\s]{0,20}actual|versi[óo]n anterior|alternativa|evaluamos|consideramos|en vez de/i,
-  solucion:/soluci[óo]n|propuesta|consiste en|la funcionalidad|el flujo propuesto|vamos a (construir|hacer|mandar|mostrar|generar|crear)|se le (sugiere|muestra|env[íi]a|recomienda)|detecta que|le (recomendamos|sugerimos)/i,
+  solucion:/soluci[óo]n|propuesta|consiste en|la funcionalidad|el flujo propuesto|funciona as[íi]|se activa|autom[áa]ticamente|permite (que|acumular|hacer|ver|elegir|generar)|vamos a (construir|hacer|mandar|mostrar|generar|crear)|se le (sugiere|muestra|env[íi]a|recomienda)|detecta que|le (recomendamos|sugerimos)|(el|la) (usuario|cliente|app|aplicaci[óo]n|sistema|herramienta|plataforma) (paga|hace|puede|entra|selecciona|recibe|detecta|calcula|env[íi]a|muestra|suma|genera)/i,
   esfuerzo:/esfuerzo (ti|t[ée]cnico|de desarrollo)?|sizing|complejidad (alta|media|baja|t[ée]cnica)|f[áa]cil de construir|dif[íi]cil de construir|semanas? de (desarrollo|trabajo)|\bsprint\b|tama[ñn]o (grande|chico|mediano|peque[ñn]o)/i,
   riesgoOdependencia:/riesgo|depende de|dependencia|requiere (un )?research|research previo|no soporta|bloque(a|o)|complejidad t[ée]cnica|podr[íi]a (complicar|fallar)|es posible que esto requiera/i
 };
@@ -808,7 +809,7 @@ const GUIA={
 /* Un check por cada punto de GUIA, en el mismo orden — para marcar en la UI qué ya
    cumple la iniciativa dentro de cada checklist (ver backlog). */
 const GUIA_CHECK={
- c1:[SENAL.solucion,/usuario|cliente|cuando |al momento de|si el usuario|le (recomendamos|sugerimos|mostramos)/i,/entonces|despu[ée]s|luego|primero|paso \d|fase \d/i,/no vamos a|no haremos|fuera de alcance|no incluye|queda fuera|no contempla/i],
+ c1:[SENAL.solucion,/usuario|cliente|cuando |al momento de|si el usuario|le (recomendamos|sugerimos|mostramos)/i,/entonces|despu[ée]s|luego|primero|paso \d|fase \d|funciona as[íi]|va (sumando|calculando|generando|acumulando)|se activa/i,/no vamos a|no haremos|fuera de alcance|no incluye|queda fuera|no contempla/i],
  c2:[SENAL.tamano,/tasa|frecuencia|cada (mes|semana|d[íi]a)|mensual|semanal|diari/i,SENAL.cifra],
  c3:[SENAL.esfuerzo,SENAL.areas,/semanas?|sprints?|\bmes(es)?\b|d[íi]as/i],
  c4:[SENAL.riesgoOdependencia,SENAL.areas,/no aplica|no hay ning[uú]n riesgo|no identifico riesgos/i]
@@ -941,8 +942,16 @@ function evaluarLocal(txt,otros){
     .filter(p=>new RegExp(p,"i").test(txt)).length;
   if(pistas<2)avisos.push("Esto no se parece mucho a una iniciativa de producto. Lo reviso igual, pero si te marco casi todo como faltante, seguramente el problema sea el texto y no tu idea.");
   if(otros&&otros.length){
-    const cab=txt.slice(0,90).toLowerCase().replace(/\s+/g," ");
-    const gem=otros.find(o=>o.prd&&o.prd.slice(0,90).toLowerCase().replace(/\s+/g," ").slice(0,45)===cab.slice(0,45));
+    /* Compara el contenido real (campo Descripción), no el texto completo: con el
+       formulario estructurado, todo empieza con las mismas etiquetas fijas
+       ("Tipo:... Descripción / cómo funciona:..."), y comparar eso daba falsos
+       positivos entre iniciativas que no tenían nada que ver (ver backlog). */
+    const cab=(camposDesdeTexto(txt).descripcion||txt).slice(0,90).toLowerCase().replace(/\s+/g," ");
+    const gem=otros.find(o=>{
+      if(!o.prd)return false;
+      const otroReal=(camposDesdeTexto(o.prd).descripcion||o.prd).slice(0,90).toLowerCase().replace(/\s+/g," ");
+      return otroReal.slice(0,45)===cab.slice(0,45);
+    });
     if(gem)avisos.push("Ya evaluaste algo muy parecido: “"+gem.nombre+"”. Si es una versión nueva, guárdala como tal para poder compararlas.");
   }
 
@@ -1221,11 +1230,22 @@ function cuadranteDe(p,r){
 
 
 /* Evaluación vía función serverless (Vercel → OpenRouter). La key nunca vive en el cliente. */
-async function evaluarConModelo(txt){
-  const r=await fetch("/api/evaluar",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({txt,corpus:corpusActual()})});
-  if(!r.ok)throw new Error("sin respuesta");
-  return await r.json();
+/* Un solo intento tumbaba la evaluación con IA ante cualquier hipo de la conexión
+   (timeout, rate limit) y caía a modo básico más seguido de lo necesario — ver backlog. */
+async function evaluarConModelo(txt,intentos=3){
+  let ultimoError;
+  for(let i=0;i<intentos;i++){
+    try{
+      const r=await fetch("/api/evaluar",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({txt,corpus:corpusActual()})});
+      if(!r.ok)throw new Error("sin respuesta");
+      return await r.json();
+    }catch(err){
+      ultimoError=err;
+      if(i<intentos-1)await new Promise(res=>setTimeout(res,600*(i+1)));
+    }
+  }
+  throw ultimoError;
 }
 /* Resumen corto para el panel lateral (Epic 7.11). El resumen con IA es obligatorio:
    nunca se cae al texto crudo. Si el intento falla, reintenta un par de veces antes
@@ -1893,9 +1913,9 @@ function leyendaNivelesHTML(){
 function veredictoHTML(e,grande){
   if(typeof e.puntaje!=="number")return semHTML(e.semaforo,e.lectura,grande);
   const n=nivelDe(e.puntaje);
-  return `<div class="sem" style="background:linear-gradient(120deg,${n.c}12,${n.c}06)">
-    <div class="marcador" style="border-color:${n.c}">
-      <b style="color:${n.c}">${e.puntaje}</b><span>de 100</span>
+  return `<div class="sem" style="background:linear-gradient(120deg,${n.c}12,${n.c}06);align-items:flex-start">
+    <div class="marcador" style="background:conic-gradient(${n.c} ${Math.max(0,Math.min(100,e.puntaje))}%, ${n.c}28 0)">
+      <div class="marcador-in"><b style="color:${n.c}">${e.puntaje}</b><span>de 100</span></div>
     </div>
     <div style="padding-right:16px"><b style="color:${n.c}">${n.t}</b>
     <span style="font-size:${grande?14.5:13}px;color:#4A4B58">${esc(e.lectura||n.d)}</span>
@@ -2048,9 +2068,25 @@ function matrizHTML(){
           <text x="${M.l+4}" y="${H-M.b+18}" class="ax">poco</text>
           <text x="${W-M.r-4}" y="${H-M.b+18}" class="ax" text-anchor="end">mucho</text>
           <text x="${(W+M.l-M.r)/2}" y="${H-8}" class="axt" text-anchor="middle">Esfuerzo</text>
-          ${con.map(({e,c})=>{const st=estadoDe(e);
-            const cx=Math.max(M.l+c.r+4,Math.min(W-M.r-c.r-4,px(c.esfuerzo)));
-            const cy=Math.max(M.t+c.r+4,Math.min(H-M.b-c.r-4,py(c.valor)));
+          ${(()=>{
+            const puntos=con.map(({e,c})=>({e,c,
+              cx:Math.max(M.l+c.r+4,Math.min(W-M.r-c.r-4,px(c.esfuerzo))),
+              cy:Math.max(M.t+c.r+4,Math.min(H-M.b-c.r-4,py(c.valor)))}));
+            /* Cuando varias caen casi en el mismo punto (ej. nadie ajustó RICE), se
+               tapan por completo entre sí. Se reparten en abanico, probando contra las
+               posiciones YA definidas de las anteriores (no las originales), para que
+               tres o más no terminen apilándose en el mismo lugar (ver backlog). */
+            puntos.forEach((p,i)=>{
+              const baseCx=p.cx,baseCy=p.cy;
+              let intento=0;
+              while(intento<8&&puntos.slice(0,i).some(q=>Math.hypot(p.cx-q.cx,p.cy-q.cy)<Math.min(p.c.r,q.c.r)*0.9)){
+                intento++;
+                const ang=intento*(Math.PI*2/5),dist=p.c.r*0.95*Math.ceil(intento/5);
+                p.cx=Math.max(M.l+p.c.r+4,Math.min(W-M.r-p.c.r-4,baseCx+Math.cos(ang)*dist));
+                p.cy=Math.max(M.t+p.c.r+4,Math.min(H-M.b-p.c.r-4,baseCy+Math.sin(ang)*dist));
+              }
+            });
+            return puntos.map(({e,c,cx,cy})=>{const st=estadoDe(e);
             const nom=(e.iniciativa||e.nombre||"?"), cod=COD[e.id]||"?";
             const col=c.sinEvaluar?"var(--faint)":nivelPuroDe(e).c;
             return `<g class="burbuja" onclick="verFicha2('${e.id}')" tabindex="0">
@@ -2058,7 +2094,8 @@ function matrizHTML(){
               <circle cx="${cx}" cy="${cy}" r="${c.r}" fill="${col}" fill-opacity="${c.estimado?".5":".9"}"
                 stroke="${c.estimado?col:"#fff"}" stroke-width="2.5" ${c.estimado?'stroke-dasharray="5 4"':""}/>
               <text x="${cx}" y="${cy+4.5}" class="bcod" text-anchor="middle">${cod}</text>
-            </g>`;}).join("")}
+            </g>`;}).join("");
+          })()}
         </svg>
       </div>
     </div>

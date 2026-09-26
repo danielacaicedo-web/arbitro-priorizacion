@@ -202,6 +202,20 @@ test("chequeosGuia: marca qué puntos del checklist ya cumple la iniciativa", ()
   assert.equal(c1.join("|"), [false, false, false, false].join("|"));
 });
 
+test("evaluarLocal: reconoce un mecanismo bien explicado sin las palabras exactas del ejemplo de calibración", () => {
+  const t = "Se aumentó la bolsa máxima de cashback mensual que reciben los usuarios por usar su Tarjeta Gold. Está pensada para clientes Gold y se activa automáticamente con cada transacción. Funciona así: el cliente paga sus compras con la tarjeta, la app va sumando sus devoluciones de forma automática y le permite acumular hasta un techo mensual.";
+  const r = L.evaluarLocal(t, []);
+  const c1 = r.criterios.find(c => c.id === "c1");
+  assert.notEqual(c1.estado, "ausente");
+});
+
+test("evaluarLocal: 'ya evaluaste algo parecido' compara el contenido real, no las etiquetas del formulario", () => {
+  const a = "Tipo: Nuevo\n\nDescripción / cómo funciona:\nSube el límite de cashback mensual para tarjetas Gold según el historial de gasto del cliente.";
+  const b = "Tipo: Nuevo\n\nDescripción / cómo funciona:\nPermite dividir el pago de una compra entre varias personas usando un link compartido.";
+  const r = L.evaluarLocal(b, [{ id: "x1", iniciativa: "otra", nombre: "otra", criterios: [{}], prd: a }]);
+  assert.ok(!r.avisos.some(a => a.includes("Ya evaluaste algo muy parecido")));
+});
+
 test("evaluarLocal: 'personas' cuenta igual que 'usuarios' para el criterio de Impacto (checklist alineado con la vara real)", () => {
   const t = "Le pasa hoy a 55,616 personas cada mes mas o menos, y ademas pasa cada semana, y estimamos que se generarian unas 5,000 transacciones nuevas.";
   const r = L.evaluarLocal(t, []);
