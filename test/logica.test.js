@@ -202,6 +202,13 @@ test("chequeosGuia: marca qué puntos del checklist ya cumple la iniciativa", ()
   assert.equal(c1.join("|"), [false, false, false, false].join("|"));
 });
 
+test("evaluarLocal: 'personas' cuenta igual que 'usuarios' para el criterio de Impacto (checklist alineado con la vara real)", () => {
+  const t = "Le pasa hoy a 55,616 personas cada mes mas o menos, y ademas pasa cada semana, y estimamos que se generarian unas 5,000 transacciones nuevas.";
+  const r = L.evaluarLocal(t, []);
+  const c2 = r.criterios.find(c => c.id === "c2");
+  assert.equal(c2.estado, "sustentado");
+});
+
 test("prioridadDe: sugiere Impacto y Esfuerzo a partir de los criterios ya evaluados (no se pide dos veces)", () => {
   const criterios = [
     { id: "c2", estado: "sustentado", cita: "55,616 usuarios" },
