@@ -45,7 +45,9 @@ test("flujo completo: evaluar, responder, ver informe y guardar en el tablero", 
         break;
       }
     }
-    await page.getByRole("button", { name: "Entregar para calificar" }).click();
+    // exact:true evita ambigüedad: el botón grande de abajo ("avanzar") también contiene
+    // este texto dentro de un bloque más largo ("Paso 3 de 3 Entregar para calificar...").
+    await page.getByRole("button", { name: "Entregar para calificar", exact: true }).click();
 
     // Paso 3 · Informe.
     await expect(page.getByRole("heading", { name: "Informe de evaluación" })).toBeVisible({ timeout: 15000 });

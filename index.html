@@ -1703,7 +1703,7 @@ function stepper(){
   const orden=["lectura","preguntas","informe"];
   const idx=orden.indexOf(p);
   const P=[["lectura","Lectura","Qué tienes y qué falta"],
-           ["preguntas","Preguntas","Lo que falta por definir"],
+           ["preguntas","Preguntas","Para fortalecer tu iniciativa"],
            ["informe","Informe","Calificación y prioridad"]];
   return `<div class="proceso">
     <button class="volver" onclick="ir('exp')">← Tablero</button>
@@ -1825,8 +1825,9 @@ function vPreguntas(e,msg){
       ${deb.length?`<span class="vc m"><i></i>A medias: ${deb.join(", ")}</span>`:""}
       ${!aus.length&&!deb.length?`<span class="vc ok"><i></i>No encontré vacíos: estas son de contraste</span>`:""}
     </div>
-    <p class="met">Cada pregunta retira uno de los cuatro riesgos de producto —valor, usabilidad, factibilidad
-    y viabilidad de negocio—, el marco de Marty Cagan. Debajo de cada una te digo cuál.</p>
+    <p class="met">Cada pregunta ataca un riesgo distinto de que la iniciativa falle: que a nadie le importe (valor),
+    que no la sepan usar (usabilidad), que no se pueda construir (factibilidad), o que no le convenga al negocio
+    (viabilidad). Debajo de cada una te digo cuál.</p>
   </div>`;
 
   const cuerpo=porque+`<div class="focoQ">
@@ -1845,7 +1846,7 @@ function vPreguntas(e,msg){
         ${i>0?`<button class="btn sec" onclick="S.exp.qi=${i-1};render()">Anterior</button>`:""}
         ${i<P.length-1
           ?`<button class="btn" onclick="S.exp.qi=${i+1};render()">Siguiente</button>`
-          :`<button class="btn" ${listo?'onclick="revisar()"':"disabled"}>${listo?"Entregar para calificar":"Responde todas para entregar"}</button>`}
+          :`<button class="btn btn-entregar" ${listo?'onclick="revisar()"':"disabled"}>${listo?"Entregar para calificar":"Te faltan "+(P.length-hechas)+" de "+P.length}</button>`}
       </div>
     </div>
   </div>
@@ -1878,9 +1879,15 @@ function vInforme(e,msg){
 /* ---------- Veredicto con calificación ---------- */
 /* Leyenda fija de qué significa cada banda — reemplaza tener que preguntarle al chat
    "¿qué significa el semáforo?" (ver backlog: mejor estático que ida y vuelta de chat). */
+const NOMBRE_COLOR_NIVEL={listo:"Verde",casi:"Ámbar",construccion:"Naranja",cruda:"Rojo"};
 function leyendaNivelesHTML(){
-  return `<div style="font-size:12px;color:var(--muted);margin-top:11px;display:flex;flex-direction:column;gap:6px">
-    ${NIVELES.slice().reverse().map(n=>`<span><b style="color:${n.c}">●</b> ${n.t.toLowerCase()}</span>`).join("")}
+  return `<div class="card" style="margin-top:14px;padding:18px 20px">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--tinta);text-transform:uppercase;margin-bottom:11px">Convención del semáforo</div>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      ${NIVELES.slice().reverse().map(n=>`<div style="font-size:13px;color:#4A4B58;line-height:1.5">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${n.c};margin-right:8px"></span>
+        <span style="font-weight:700;color:${n.c}">${NOMBRE_COLOR_NIVEL[n.clave]}:</span> ${esc(n.t)} — ${esc(n.d)}</div>`).join("")}
+    </div>
   </div>`;
 }
 function veredictoHTML(e,grande){
@@ -2838,6 +2845,12 @@ function marcarPunto(i){
     if(t)t.textContent=listo?"Entregar para calificar":"Te faltan "+(P.length-hechas)+" de "+P.length;
     if(e)e.textContent=listo?"Reviso con tus respuestas y te entrego la calificación y el informe."
                             :"Responde todas, o marca las que no sepas. Ninguna se pierde.";
+  }
+  const be=document.querySelector(".btn-entregar");
+  if(be){
+    be.disabled=!listo;
+    be.onclick=listo?revisar:null;
+    be.textContent=listo?"Entregar para calificar":"Te faltan "+(P.length-hechas)+" de "+P.length;
   }
 }
 function ordenados(){
