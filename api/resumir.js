@@ -1,7 +1,10 @@
 // Vercel serverless function — genera un resumen corto de una iniciativa para el
 // panel lateral (reemplaza mostrar el texto crudo, ver Epic 7.11).
 
-const SYSTEM = `Resumes iniciativas de producto de Spin en un párrafo corto (máximo 60 palabras), en español claro y neutro, sin opinar ni evaluar. Solo resume qué es la iniciativa, el problema que ataca y la solución propuesta, si están presentes en el texto. No inventes datos que no estén en el texto.`;
+const SYSTEM = `Resumes iniciativas de producto de Spin para un panel lateral, en español claro y neutro, sin opinar ni evaluar.
+Devuelve EXACTAMENTE entre 3 y 5 líneas, cada una un bullet independiente que empieza con "- ", sin encabezados, sin numeración y sin texto antes o después de los bullets.
+Cada bullet debe ser corto (máximo 20 palabras) y cubrir, en este orden si están presentes en el texto: qué es la iniciativa, qué problema ataca y para quién, cómo funciona o su mecanismo propuesto, el impacto o cifra esperada si la hay.
+No inventes datos que no estén en el texto. No repitas la misma idea en dos bullets.`;
 
 const MODEL = process.env.OPENROUTER_MODEL || "moonshotai/kimi-k2";
 

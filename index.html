@@ -7,8 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
@@ -436,6 +434,9 @@ nav button.on{background:linear-gradient(135deg,#FFFFFF,#F7F2FF)}
 .docfmt td,.docfmt th{border:1px solid var(--line);padding:5px 7px;vertical-align:top;text-align:left}
 .docfmt th,.docfmt tr:first-child td{background:var(--lilaSuave);font-weight:700;color:var(--tinta)}
 .docfmt strong{color:var(--tinta)}
+.resumenIA{margin:0;padding-left:20px}
+.resumenIA li{margin-bottom:12px;line-height:1.6;font-family:var(--serif);font-size:13.5px;color:#3A3B47}
+.resumenIA li:last-child{margin-bottom:0}
 
 
 .comofunciona{margin:0 0 24px}
@@ -640,7 +641,7 @@ footer{border-top:1px solid var(--line);padding:20px;text-align:center;font-size
   </div>
   
   <nav>
-    <button id="nav-inicio" class="on" onclick="S.doc='';S.meta={iniciativa:'',squad:'',autor:''};S.colaSeleccion=null;S.colaPendiente=null;ir('inicio')">Nueva evaluación</button>
+    <button id="nav-inicio" class="on" onclick="S.doc='';S.meta={iniciativa:'',squad:'',autor:''};S.campos={tipo:'',descripcion:'',impacto:'',esfuerzo:'',riesgos:''};S.colaSeleccion=null;S.colaPendiente=null;ir('inicio')">Nueva evaluación</button>
     <button id="nav-ini" onclick="ir('ini')">Iniciativas por squad</button>
     <button id="nav-exp" onclick="ir('exp')">Tablero de priorización</button>
   </nav>
@@ -796,23 +797,7 @@ const EJEMPLO={
  c4:"Depende de que Riesgos valide el patrón de detección, y es posible que requiera un research previo porque el equipo de tarjetas levantó un riesgo similar en otro flujo."
 };
 
-/* ---- PRDs de ejemplo ---- */
-const PRD_V1=`Alertas de consumo en tiempo real
-Squad: Card Experience - Payments
-
-1. Contexto
-Muchos usuarios de Spin by OXXO usan su tarjeta y no saben cuánto llevan gastado en el mes.
-
-2. Problema
-Los usuarios se enteran de sus consumos hasta el corte. Eso genera frustración y sensación de poco control sobre su dinero.
-
-3. Solución
-Mandar una notificación push con el monto y el comercio apenas se registra el movimiento. También mostrar un acumulado del mes dentro de la app.
-
-Creemos que esto va a mejorar mucho la experiencia y la percepción de control. Es algo que piden los usuarios en las reseñas de la tienda.
-
-Arrancamos cuando desarrollo tenga espacio.`;
-
+/* ---- PRD de ejemplo ---- */
 const PRD_V2=`Alertas de consumo en tiempo real
 Squad: Card Experience - Payments
 Dueño del documento: PM de Card Experience
@@ -1146,6 +1131,25 @@ function sugerirEsfuerzo(t){
   const tec=/no soporta|migraci|motor de reglas|integraci[óo]n con|latencia|deuda t[ée]cnica/i.test(t)?1:0;
   return Math.max(1,Math.min(5,Math.round(fases*0.5+areas*0.6+tec*1.2)||1));
 }
+/* Cruce con los 4 criterios ya evaluados (evita pedirle al PM lo mismo dos veces,
+   una en el criterio de calificación y otra en RICE — ver backlog). */
+function sugerirEsfuerzoDesdeCriterio(t,c3){
+  if(c3&&c3.estado==="sustentado"){
+    const m=(c3.cita||"").toLowerCase();
+    if(/muy alto|alt[íi]sim[oa]/.test(m))return 5;
+    if(/\balto\b|grande|complej[oa]/.test(m))return 4;
+    if(/medio|mediano/.test(m))return 3;
+    if(/muy bajo|m[íi]nimo/.test(m))return 1;
+    if(/\bbajo\b|chico|peque[ñn]o|f[áa]cil/.test(m))return 2;
+  }
+  return sugerirEsfuerzo(t);
+}
+function sugerirImpactoDesdeCriterio(c2){
+  if(!c2)return null;
+  if(c2.estado==="sustentado")return 2;   // Alto
+  if(c2.estado==="débil")return 1;        // Medio
+  return null;                            // ausente: no adivinamos, que lo declare el PM
+}
 function confianzaDe(criterios){
   const ev=(criterios||[]).find(c=>c.id==="c2");
   const e=ev?ev.estado:"ausente";
@@ -1158,9 +1162,11 @@ const IMPACTOS=[{v:3,t:"Masivo"},{v:2,t:"Alto"},{v:1,t:"Medio"},{v:0.5,t:"Bajo"}
 const ESFUERZOS=[{v:1,t:"Muy bajo"},{v:2,t:"Bajo"},{v:3,t:"Medio"},{v:4,t:"Alto"},{v:5,t:"Muy alto"}];
 
 function prioridadDe(t,criterios){
-  return{alcance:sugerirAlcance(t),impacto:null,
-         confianza:confianzaDe(criterios),esfuerzo:sugerirEsfuerzo(t),
-         sugerido:{alcance:sugerirAlcance(t)!==null,esfuerzo:true}};
+  const c2=(criterios||[]).find(c=>c.id==="c2"),c3=(criterios||[]).find(c=>c.id==="c3");
+  const impacto=sugerirImpactoDesdeCriterio(c2);
+  return{alcance:sugerirAlcance(t),impacto,
+         confianza:confianzaDe(criterios),esfuerzo:sugerirEsfuerzoDesdeCriterio(t,c3),
+         sugerido:{alcance:sugerirAlcance(t)!==null,impacto:impacto!==null,esfuerzo:true}};
 }
 function riceDe(pr){
   if(!pr||pr.alcance===null||pr.impacto===null)return null;
@@ -1197,21 +1203,33 @@ async function evaluarConModelo(txt){
   if(!r.ok)throw new Error("sin respuesta");
   return await r.json();
 }
-/* Resumen corto para el panel lateral (Epic 7.11) — reemplaza mostrar el texto crudo.
-   Si falla, docHTML()/docVerHTML() caen solas al texto original. */
-async function resumirConIA(txt){
-  const r=await fetch("/api/resumir",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({txt})});
-  if(!r.ok)throw new Error("sin respuesta");
-  const d=await r.json();
-  return d.resumen||null;
+/* Resumen corto para el panel lateral (Epic 7.11). El resumen con IA es obligatorio:
+   nunca se cae al texto crudo. Si el intento falla, reintenta un par de veces antes
+   de rendirse; panelDocHTML() muestra ahí un estado de error con botón "Reintentar". */
+async function resumirConIA(txt,intentos=3){
+  let ultimoError;
+  for(let i=0;i<intentos;i++){
+    try{
+      const r=await fetch("/api/resumir",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({txt})});
+      if(!r.ok)throw new Error("sin respuesta");
+      const d=await r.json();
+      if(d.resumen)return d.resumen;
+      throw new Error("resumen vacío");
+    }catch(err){
+      ultimoError=err;
+      if(i<intentos-1)await new Promise(res=>setTimeout(res,600*(i+1)));
+    }
+  }
+  throw ultimoError;
 }
 
 /* ============================================================ ESTADO
    Vive en Firestore (espacio compartido, sin login). S.expedientes/S.corpus/S.podio
    se mantienen sincronizados en vivo por los listeners que arrancan al final del archivo. */
 let S={verLey:false,sq:"",podio:null,arrastrando:null,busca:"",vsq:"todas",viendo:null,docHtml:"",vista:"inicio",doc:"",exp:null,expedientes:[],corpus:[],orden:"fecha",filtro:"todas",
-       meta:{iniciativa:"",squad:"",autor:""},aviso:"",fase:"",comparando:null,editando:null,colaSeleccion:null,colaPendiente:null};
+       meta:{iniciativa:"",squad:"",autor:""},campos:{tipo:"",descripcion:"",impacto:"",esfuerzo:"",riesgos:""},
+       aviso:"",fase:"",comparando:null,editando:null,colaSeleccion:null,colaPendiente:null};
 function corpusActual(){return S.corpus||[];}
 /* Guarda el expediente indicado (o S.exp si no se pasa ninguno) en Firestore. */
 function guardarExp(exp){Fire.guardarExpediente(exp||S.exp);}
@@ -1393,21 +1411,44 @@ function vInicio(){
       </select></label>
       <label>Responsable<input value="${esc(S.meta.autor)}" placeholder="Tu nombre" oninput="S.meta.autor=this.value"></label>
     </div>
-    <label for="txt" style="font-weight:600;font-size:13.5px;display:block;margin:16px 0 8px">
-      Cuenta tu iniciativa. Como la tengas: una idea suelta, media página o algo bien desarrollado</label>
-    <textarea id="txt" rows="8" placeholder="Qué problema viste, a quién le pasa, qué se te ocurrió hacer… lo que tengas por ahora"
-      oninput="S.doc=this.value">${esc(S.doc)}</textarea>
+
+    <label style="font-weight:600;font-size:13.5px;display:block;margin:18px 0 6px">¿Es algo nuevo o es una mejora?</label>
+    <select style="max-width:280px" onchange="S.campos.tipo=this.value">
+      <option value="">Selecciona</option>
+      <option value="Nuevo" ${S.campos.tipo==="Nuevo"?"selected":""}>Algo nuevo</option>
+      <option value="Mejora" ${S.campos.tipo==="Mejora"?"selected":""}>Mejora a algo que ya existe</option>
+    </select>
+
+    <label for="campo-descripcion" style="font-weight:600;font-size:13.5px;display:block;margin:18px 0 4px">Descripción / cómo funciona
+      <em style="display:block;font-weight:500;font-style:normal;font-size:12px;color:var(--faint);margin-top:2px">Qué problema resuelve, para quién, y qué haría el producto. Ej: “Si el usuario está en una tienda que recibe muchos SPEI IN o P2P IN, le recomendamos transferir a esa cuenta.”</em></label>
+    <textarea id="campo-descripcion" rows="3" placeholder="Opcional, pero entre mejor lo cuentes, mejor te oriento"
+      oninput="actualizarCampo('descripcion',this.value)">${esc(S.campos.descripcion)}</textarea>
+
+    <label for="campo-impacto" style="font-weight:600;font-size:13.5px;display:block;margin:14px 0 4px">Impacto estimado
+      <em style="display:block;font-weight:500;font-style:normal;font-size:12px;color:var(--faint);margin-top:2px">La cifra que dimensiona el impacto: población o usuarios afectados, el % o factor esperado, y el resultado estimado. Ej: “Población SbO con este patrón: 55,616 mensual. Tasa esperada: 10.11%. Estimado: 5,623 transacciones.”</em></label>
+    <textarea id="campo-impacto" rows="3" placeholder="Opcional"
+      oninput="actualizarCampo('impacto',this.value)">${esc(S.campos.impacto)}</textarea>
+
+    <label for="campo-esfuerzo" style="font-weight:600;font-size:13.5px;display:block;margin:14px 0 4px">Esfuerzo estimado
+      <em style="display:block;font-weight:500;font-style:normal;font-size:12px;color:var(--faint);margin-top:2px">Idea de alto nivel de qué tan grande es construirlo: sizing, semanas, complejidad. Ej: “Mediano, ~3 sprints, requiere cambios en el motor de recomendaciones.”</em></label>
+    <textarea id="campo-esfuerzo" rows="2" placeholder="Opcional"
+      oninput="actualizarCampo('esfuerzo',this.value)">${esc(S.campos.esfuerzo)}</textarea>
+
+    <label for="campo-riesgos" style="font-weight:600;font-size:13.5px;display:block;margin:14px 0 4px">Riesgos y dependencias <span style="font-weight:500;color:var(--faint)">(opcional)</span>
+      <em style="display:block;font-weight:500;font-style:normal;font-size:12px;color:var(--faint);margin-top:2px">Algún riesgo, o de qué otro squad depende. Ej: “Depende de datos de geolocalización de Segment-led Solutions.”</em></label>
+    <textarea id="campo-riesgos" rows="2" placeholder="Opcional"
+      oninput="actualizarCampo('riesgos',this.value)">${esc(S.campos.riesgos)}</textarea>
 
     <div class="drop" id="drop">
-      También puedes <label style="color:var(--accent);font-weight:600;cursor:pointer;text-decoration:underline">
-      subir un archivo<input type="file" accept=".docx,.pdf,.txt,.md,.xlsx,.xls" style="display:none" onchange="leerArchivo(this.files[0])"></label>
-      o arrastrarlo aquí. Word, PDF, Excel o texto. Si el Excel trae varias iniciativas, te dejo elegir cuáles evaluar.
+      ¿Tienes varias iniciativas juntas en un Excel? <label style="color:var(--accent);font-weight:600;cursor:pointer;text-decoration:underline">
+      súbelo aquí<input type="file" accept=".xlsx,.xls" style="display:none" onchange="leerArchivo(this.files[0])"></label>
+      o arrástralo, y te dejo elegir cuáles evaluar.
       <div id="estadoArchivo" style="font-size:12.5px;color:var(--faint);margin-top:6px"></div>
     </div>
 
     <div style="display:flex;gap:12px;align-items:center;margin-top:14px;flex-wrap:wrap">
       <button class="btn" onclick="empezar()">Evaluar iniciativa</button>
-      <button class="btn link" onclick="S.doc=PRD_V1;S.meta={iniciativa:'Alertas de consumo en tiempo real',squad:'Card Experience',autor:''};render()">Usar una iniciativa de ejemplo</button>
+      <button class="btn link" onclick="usarEjemplo()">Usar una iniciativa de ejemplo</button>
     </div>
   </div>`;
 }
@@ -1420,6 +1461,51 @@ function textoDesdeFila(i){
   if(i.objetivo)l.push("Objetivo: "+i.objetivo);
   if(i.estado)l.push("Estado: "+i.estado);
   return l.join("\n");
+}
+
+/* ---------- Formulario estructurado (reemplaza el textarea libre / upload de PDF-Word-txt) ----------
+   Ningún campo es obligatorio: lo que quede vacío se lee como "ausente" en su criterio,
+   y el flujo de preguntas que ya existe después de evaluar es el que le señala al PM
+   qué le faltó y lo invita a completarlo — no hace falta bloquear el envío aquí. */
+const ETIQUETAS_CAMPO={
+  descripcion:"Descripción / cómo funciona",
+  impacto:"Impacto estimado",
+  esfuerzo:"Esfuerzo estimado",
+  riesgos:"Riesgos y dependencias"
+};
+function textoDesdeCampos(c){
+  const partes=[];
+  if(c.tipo)partes.push("Tipo: "+c.tipo);
+  ["descripcion","impacto","esfuerzo","riesgos"].forEach(k=>{
+    if(c[k]&&c[k].trim())partes.push(ETIQUETAS_CAMPO[k]+":\n"+c[k].trim());
+  });
+  return partes.join("\n\n");
+}
+function camposDesdeTexto(t){
+  const c={tipo:"",descripcion:"",impacto:"",esfuerzo:"",riesgos:""};
+  const claves=Object.keys(ETIQUETAS_CAMPO);
+  const patron=new RegExp("\\n\\n(?=(?:"+["Tipo",...claves.map(k=>ETIQUETAS_CAMPO[k].replace(/[.*+?^${}()|[\]\\]/g,"\\$&"))].join("|")+"):)");
+  let reconocido=false;
+  (t||"").split(patron).forEach(b=>{
+    if(/^Tipo:/.test(b)){c.tipo=b.replace(/^Tipo:\s*/,"").trim();reconocido=true;return;}
+    for(const k of claves){
+      const re=new RegExp("^"+ETIQUETAS_CAMPO[k].replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+":\\s*\\n?");
+      if(re.test(b)){c[k]=b.replace(re,"").trim();reconocido=true;return;}
+    }
+  });
+  if(!reconocido)c.descripcion=(t||"").trim();
+  return c;
+}
+function actualizarCampo(campo,valor){
+  S.campos[campo]=valor;
+  S.doc=textoDesdeCampos(S.campos);
+  render();
+}
+function usarEjemplo(){
+  S.campos={tipo:"Nuevo",descripcion:EJEMPLO.c1,impacto:EJEMPLO.c2,esfuerzo:EJEMPLO.c3,riesgos:EJEMPLO.c4};
+  S.doc=textoDesdeCampos(S.campos);
+  S.meta={iniciativa:"Sugerencia por geolocalización",squad:"Money Movement",autor:S.meta.autor};
+  render();
 }
 function vSeleccionMulti(){
   const L=S.colaSeleccion;
@@ -1452,6 +1538,7 @@ function cargarSiguienteDeCola(){
   if(!S.colaPendiente||!S.colaPendiente.length){S.colaPendiente=null;render();return;}
   const item=S.colaPendiente.shift();
   S.doc=textoDesdeFila(item);S.docHtml="";
+  S.campos={tipo:"",descripcion:S.doc,impacto:"",esfuerzo:"",riesgos:""};
   S.meta={iniciativa:item.nombre||"",squad:item.squad||"",autor:S.meta.autor||""};
   set({vista:"inicio",aviso:"Completa o corrige esta iniciativa antes de evaluarla."+(S.colaPendiente.length?" Te quedan "+S.colaPendiente.length+" más en la cola.":" Es la última de la cola.")});
 }
@@ -1705,23 +1792,23 @@ function fichaHTML(e){
     </div>
     <div class="campos">
       <label>Alcance
-        <div class="cx"><input type="number" min="0" max="100" value="${pr.alcance===null?"":pr.alcance}"
+        <div class="cx"><input id="riceAlcance" type="number" min="0" max="100" value="${pr.alcance===null?"":pr.alcance}"
           oninput="setRice('alcance',this.value)"><span>% de usuarios</span></div>
         <em>${pr.sugerido&&pr.sugerido.alcance?"detectado en lo que escribiste, confírmalo":"no lo encontré en lo que escribiste"}</em></label>
       <label>Impacto
-        <select onchange="setRice('impacto',this.value)">
+        <select id="riceImpacto" onchange="setRice('impacto',this.value)">
           <option value="">Elige</option>
           ${IMPACTOS.map(i=>`<option value="${i.v}" ${pr.impacto==i.v?"selected":""}>${i.t} (${i.v})</option>`).join("")}
         </select>
-        <em>cuánto mueve la métrica a quien alcanza</em></label>
+        <em>${pr.sugerido&&pr.sugerido.impacto?"según el criterio de Impacto estimado, confírmalo":"cuánto mueve la métrica a quien alcanza"}</em></label>
       <label>Confianza
         <div class="fijo" style="color:var(--morado)">${pr.confianza.valor}%</div>
         <em>${pr.confianza.fuente}</em></label>
       <label>Esfuerzo
-        <select onchange="setRice('esfuerzo',this.value)">
+        <select id="riceEsfuerzo" onchange="setRice('esfuerzo',this.value)">
           ${ESFUERZOS.map(i=>`<option value="${i.v}" ${pr.esfuerzo==i.v?"selected":""}>${i.t} (${i.v})</option>`).join("")}
         </select>
-        <em>sugerido por fases y áreas involucradas</em></label>
+        <em>según el criterio de Esfuerzo estimado y las fases/áreas involucradas</em></label>
     </div>
     ${falta.length?`<div class="faltaR">Para estimar la prioridad me falta: ${falta.join(" y ")}.</div>`:""}
     <div class="cuad"><b>${cu.t}</b><span>${cu.d}</span></div>
@@ -1957,23 +2044,48 @@ function comoDoc(t){
     return "<p>"+esc(s)+"</p>";
   }).join("").replace(/(<li>.*?<\/li>)+/g,m=>"<ul>"+m+"</ul>");
 }
-/* Panel lateral: resumen generado por IA (con disclaimer) si existe; si no
-   (falló la generación, o es un expediente de antes de este cambio), cae al
-   texto original tal cual — nunca se queda sin mostrar nada. */
-function panelDocHTML(exp,nota){
+/* Panel lateral: siempre resumen generado por IA, con disclaimer, en bullets cortos
+   y bien espaciados — nunca el texto crudo (ver backlog: el texto crudo "es un chorro
+   pesado, difícil de leer" y el resumen "no debe fallar"). Mientras se genera o si hay
+   que reintentar, se muestra un estado explícito en vez de una versión degradada. */
+function bulletsDeResumen(resumen){
+  return resumen.split("\n").map(l=>l.replace(/^[\s\-•]+/,"").trim()).filter(Boolean);
+}
+function panelDocHTML(exp){
   const resumen=exp.resumenIA;
+  const cargando=!!exp._cargandoResumen||(S.exp&&S.exp.id===exp.id&&S.fase==="leyendo");
+  let cuerpo;
+  if(resumen){
+    cuerpo=`<div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.03em;margin:6px 0 2px">Resumen generado por IA</div>
+      <div style="font-size:12px;color:var(--faint);margin:0 0 14px">No es el texto original — puede no capturar todos los detalles.</div>
+      <ul class="resumenIA">${bulletsDeResumen(resumen).map(b=>`<li>${esc(b)}</li>`).join("")}</ul>`;
+  }else if(cargando){
+    cuerpo=`<div style="font-size:12px;color:var(--faint);margin:4px 0 12px">Generando un resumen con IA…</div>
+      <div class="typing"><span></span><span></span><span></span></div>`;
+  }else{
+    cuerpo=`<div style="font-size:12.5px;color:var(--ambar);background:var(--duraznoSuave);border-radius:10px;padding:12px 14px;margin:4px 0 4px">No pude generar el resumen con IA todavía.</div>
+      <button class="btn sec mini" style="margin-top:8px" onclick="reintentarResumen('${exp.id}')">Reintentar</button>`;
+  }
   return `<aside class="card doc">
     <div style="font-size:13.5px;font-weight:700">${esc(exp.nombre)}</div>
-    ${resumen?`
-      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.03em;margin:6px 0 2px">Resumen generado por IA</div>
-      <div style="font-size:12px;color:var(--faint);margin:0 0 12px">No es el texto original — puede no capturar todos los detalles.</div>
-      <div class="docfmt">${esc(resumen)}</div>`
-    :`<div style="font-size:12px;color:var(--faint);margin:4px 0 12px">${nota}</div>
-      <div class="docfmt">${exp.prdHtml?exp.prdHtml:comoDoc(exp.prd)}</div>`}
+    ${cuerpo}
   </aside>`;
 }
 function docHTML(){
-  return panelDocHTML(S.exp,"Tu iniciativa, tal como la entregaste. Para cambiarla se crea una versión nueva.");
+  return panelDocHTML(S.exp);
+}
+/* Botón "Reintentar" del panel — sirve tanto para la iniciativa que se está
+   evaluando como para una ya guardada (incluidas las de antes de este cambio,
+   que nunca llegaron a tener resumen). */
+async function reintentarResumen(id){
+  const exp=(S.exp&&S.exp.id===id)?S.exp:(S.viendo&&S.viendo.id===id?S.viendo:S.expedientes.find(x=>x.id===id));
+  if(!exp||!exp.prd)return;
+  exp._cargandoResumen=true;render();
+  const resumen=await resumirConIA(exp.prd).catch(()=>null);
+  exp._cargandoResumen=false;
+  exp.resumenIA=resumen||null;
+  if(S.expedientes.includes(exp))guardarExp(exp);
+  render();
 }
 
 function actaHTML(e){
@@ -2331,7 +2443,7 @@ function vVer(){
   </div>${docVerHTML(e)}</div>`;
 }
 function docVerHTML(e){
-  return panelDocHTML(e,"La iniciativa tal como la entregaron.");
+  return panelDocHTML(e);
 }
 function vIniciativas(){
   const n=S.corpus.length;
@@ -2473,7 +2585,7 @@ function imprimirActa(){
 
 /* ============================================================ ACCIONES */
 let _pantalla="";
-function render(){
+function renderInterno(){
   try{
   const clave=S.vista+"|"+(S.exp?(S.exp.paso||"")+"|"+S.exp.id:"")+"|"+(S.viendo?S.viendo.id:"");
   if(clave!==_pantalla){_pantalla=clave;requestAnimationFrame(()=>window.scrollTo({top:0,behavior:"auto"}));}
@@ -2484,6 +2596,22 @@ function render(){
   $("#main").innerHTML=av+(S.vista==="inicio"?vInicio():S.vista==="chat"?vChat():S.vista==="ini"?vIniciativas():S.vista==="ver"?vVer():vExp());
   if(S.vista==="inicio")armarDrop();
   }catch(err){console.error(err);$("#main").innerHTML='<div class="aviso">Algo se rompió al dibujar la pantalla. Recarga el archivo y vuelve a intentarlo.</div>';}
+}
+/* render() reemplaza #main entero, así que cualquier input que tuviera el foco lo pierde.
+   Eso causaba el salto de scroll al escribir (Alcance) y también podía robar el foco cuando
+   el listener de Firestore (escucharExpedientes) redibuja después de un guardado en segundo
+   plano, a medio tecleo. Por eso el foco se preserva aquí, en el propio render(), y no solo
+   en el sitio donde se originó el cambio: cubre también esos redibujados asíncronos. */
+function render(){
+  const foco=document.activeElement,id=foco&&foco.id;
+  const ini=foco&&typeof foco.selectionStart==="number"?foco.selectionStart:null;
+  const fin=foco&&typeof foco.selectionEnd==="number"?foco.selectionEnd:null;
+  renderInterno();
+  if(!id)return;
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.focus();
+  if(ini!=null&&el.setSelectionRange){try{el.setSelectionRange(ini,fin);}catch(e){}}
 }
 
 function pintarProgreso(){
@@ -2611,7 +2739,8 @@ function ordenados(){
 }
 function nuevaVersion(id){
   const e=S.expedientes.find(x=>x.id===id);if(!e)return;
-  S.doc=e.prd; S.meta={iniciativa:e.iniciativa||"",squad:e.squad||"",autor:e.autor||""};
+  S.doc=e.prd; S.campos=camposDesdeTexto(e.prd);
+  S.meta={iniciativa:e.iniciativa||"",squad:e.squad||"",autor:e.autor||""};
   set({vista:"inicio",aviso:"Cargué la iniciativa “"+(e.iniciativa||e.nombre)+"”. Edítala y vuelve a pasarla: se guarda como versión "+((e.version||1)+1)+" y podrás compararlas."});
 }
 function abrir(id){S.exp=S.expedientes.find(e=>e.id===id);if(!S.exp.paso)S.exp.paso=S.exp.cerrado?"informe":"lectura";ir("chat");}
@@ -2624,26 +2753,16 @@ function armarDrop(){
   ["dragleave","drop"].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.remove("over");}));
   d.addEventListener("drop",e=>{if(e.dataTransfer.files[0])leerArchivo(e.dataTransfer.files[0]);});
 }
+/* Solo Excel: es para carga masiva de varias iniciativas (ver backlog — Word/PDF/texto
+   sueltos se quitaron porque no hay forma confiable de saber si traen una iniciativa o
+   varias mezcladas; para una sola, se usa el formulario de arriba). */
 async function leerArchivo(f){
   if(!f)return;
   const est=$("#estadoArchivo");const di=t=>{if(est)est.textContent=t;};
   di("Leyendo "+f.name+"…");
   const n=f.name.toLowerCase();
   try{
-    if(n.endsWith(".txt")||n.endsWith(".md")){S.doc=await f.text();S.docHtml="";}
-    else if(n.endsWith(".docx")){
-      if(!window.mammoth)throw new Error("lib");
-      const b=await f.arrayBuffer();
-      S.doc=(await mammoth.extractRawText({arrayBuffer:b})).value;
-      try{S.docHtml=(await mammoth.convertToHtml({arrayBuffer:b})).value;}catch(e){S.docHtml="";}
-    }else if(n.endsWith(".pdf")){
-      if(!window.pdfjsLib)throw new Error("lib");
-      pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-      const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
-      let t="";for(let i=1;i<=doc.numPages;i++){const p=await doc.getPage(i);
-        t+=(await p.getTextContent()).items.map(x=>x.str).join(" ")+"\n\n";}
-      S.doc=t;S.docHtml="";
-    }else if(n.endsWith(".xlsx")||n.endsWith(".xls")){
+    if(n.endsWith(".xlsx")||n.endsWith(".xls")){
       if(!window.XLSX)throw new Error("lib");
       const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});
       const hoja=wb.Sheets[wb.SheetNames[0]];
@@ -2657,14 +2776,15 @@ async function leerArchivo(f){
         return;
       }
       S.doc=textoDesdeFila(lista[0]);S.docHtml="";
+      S.campos={tipo:"",descripcion:S.doc,impacto:"",esfuerzo:"",riesgos:""};
       S.meta={iniciativa:lista[0].nombre||"",squad:lista[0].squad||"",autor:S.meta.autor};
     }else throw new Error("tipo");
     render();
     const e2=$("#estadoArchivo");if(e2)e2.textContent="Listo: "+f.name+" ("+S.doc.trim().length+" caracteres).";
   }catch(err){
     di(err.message==="lib"
-      ? "No pude abrir ese archivo ahora. Pega el texto directamente y seguimos."
-      : "Ese formato no lo puedo leer. Usa Word, PDF o texto, o pega el contenido.");
+      ? "No pude abrir ese archivo ahora. Copia el contenido en el formulario de arriba."
+      : "Ese formato no lo puedo leer. Solo acepto Excel (.xlsx/.xls) aquí — para una sola iniciativa usa el formulario de arriba.");
   }
 }
 

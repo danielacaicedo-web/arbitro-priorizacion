@@ -173,3 +173,32 @@ test("filasDesdeCSV: detecta punto y coma como delimitador si es el que predomin
   const filas = L.filasDesdeCSV(txt);
   assert.equal(filas[1].join("|"), ["Money Movement", "Límites dinámicos", "Reducir fraude", "En definición"].join("|"));
 });
+
+test("textoDesdeCampos/camposDesdeTexto: hacen round-trip del formulario estructurado", () => {
+  const campos = { tipo: "Nuevo", descripcion: "Explica el mecanismo.", impacto: "55,616 usuarios.", esfuerzo: "Mediano.", riesgos: "" };
+  const texto = L.textoDesdeCampos(campos);
+  assert.ok(texto.includes("Descripción / cómo funciona:\nExplica el mecanismo."));
+  assert.ok(!texto.includes("Riesgos y dependencias"), "un campo vacío no debe aparecer en el texto armado");
+  const de_vuelta = L.camposDesdeTexto(texto);
+  assert.equal(de_vuelta.tipo, "Nuevo");
+  assert.equal(de_vuelta.descripcion, "Explica el mecanismo.");
+  assert.equal(de_vuelta.impacto, "55,616 usuarios.");
+  assert.equal(de_vuelta.esfuerzo, "Mediano.");
+});
+
+test("camposDesdeTexto: texto libre sin etiquetas cae completo en 'descripcion' (compatibilidad con iniciativas viejas)", () => {
+  const de_vuelta = L.camposDesdeTexto("Un texto libre de una iniciativa vieja, sin ninguna etiqueta.");
+  assert.equal(de_vuelta.descripcion, "Un texto libre de una iniciativa vieja, sin ninguna etiqueta.");
+  assert.equal(de_vuelta.impacto, "");
+});
+
+test("prioridadDe: sugiere Impacto y Esfuerzo a partir de los criterios ya evaluados (no se pide dos veces)", () => {
+  const criterios = [
+    { id: "c2", estado: "sustentado", cita: "55,616 usuarios" },
+    { id: "c3", estado: "sustentado", cita: "esfuerzo alto, requiere 3 sprints" },
+  ];
+  const pr = L.prioridadDe("texto cualquiera", criterios);
+  assert.equal(pr.impacto, 2); // Alto
+  assert.equal(pr.esfuerzo, 4); // Alto
+  assert.equal(pr.sugerido.impacto, true);
+});
