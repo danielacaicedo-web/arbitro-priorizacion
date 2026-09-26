@@ -30,8 +30,9 @@ export default async function handler(req, res) {
   const prompt = `Evalúa esta iniciativa. JSON:
 {"no_evaluable":bool,"minimos_faltantes":[],"criterios":[{"id":"c1","nombre":"Claridad de la propuesta","estado":"","cita":"","nota":""}],"preguntas":[{"id":"p1","criterio":"c2","origen":"generada","texto":""}],"dependencias":[{"tipo":"","iniciativa":"","squad":"","nota":""}],"cobertura":""}
 Entre 3 y 5 preguntas, solo para criterios débiles o ausentes.
+"dependencias" son SOLO solapamientos con otras iniciativas de la lista "INICIATIVAS DECLARADAS" de abajo — nunca inventes una iniciativa, squad o sistema que no esté literalmente en esa lista. Si "INICIATIVAS DECLARADAS" está vacía, "dependencias" debe ser un array vacío []. No confundas un sistema o capacidad que la propia iniciativa necesita (por ejemplo, "requiere generar links de pago") con una iniciativa de otro squad: eso no es una dependencia con otra iniciativa, es parte del esfuerzo de esta.
 INICIATIVAS DECLARADAS:
-${corpusTxt}
+${corpusTxt||"(ninguna declarada)"}
 INICIATIVA:
 ${txt}`;
 

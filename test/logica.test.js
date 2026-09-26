@@ -192,6 +192,16 @@ test("camposDesdeTexto: texto libre sin etiquetas cae completo en 'descripcion' 
   assert.equal(de_vuelta.impacto, "");
 });
 
+test("chequeosGuia: marca qué puntos del checklist ya cumple la iniciativa", () => {
+  const texto = "Población SbO con este patrón: 55,616 mensual. Esfuerzo TI medio, sizing mediano. Depende de que Riesgos valide el patrón.";
+  const c2 = L.chequeosGuia("c2", texto);
+  assert.equal(c2[1], true); // frecuencia/periodo ("mensual")
+  const c3 = L.chequeosGuia("c3", texto);
+  assert.equal(c3[0], true); // sizing
+  const c1 = L.chequeosGuia("c1", "");
+  assert.equal(c1.join("|"), [false, false, false, false].join("|"));
+});
+
 test("prioridadDe: sugiere Impacto y Esfuerzo a partir de los criterios ya evaluados (no se pide dos veces)", () => {
   const criterios = [
     { id: "c2", estado: "sustentado", cita: "55,616 usuarios" },

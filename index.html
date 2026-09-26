@@ -805,6 +805,17 @@ const GUIA={
  c3:["Tamaño relativo del esfuerzo (chico, mediano, grande) o un sizing.","Si toca más de un equipo, sistema o fase.","Una referencia de tiempo, si la tienes (semanas, sprints)."],
  c4:["Un riesgo concreto que podría complicar la ejecución.","De qué otro equipo o sistema depende, si depende de alguno.","Si de verdad no aplica ninguno, decirlo explícitamente."]
 };
+/* Un check por cada punto de GUIA, en el mismo orden — para marcar en la UI qué ya
+   cumple la iniciativa dentro de cada checklist (ver backlog). */
+const GUIA_CHECK={
+ c1:[SENAL.solucion,/usuario|cliente|cuando |al momento de|si el usuario|le (recomendamos|sugerimos|mostramos)/i,/entonces|despu[ée]s|luego|primero|paso \d|fase \d/i,/no vamos a|no haremos|fuera de alcance|no incluye|queda fuera|no contempla/i],
+ c2:[SENAL.tamano,/tasa|frecuencia|cada (mes|semana|d[íi]a)|mensual|semanal|diari/i,SENAL.cifra],
+ c3:[SENAL.esfuerzo,SENAL.areas,/semanas?|sprints?|\bmes(es)?\b|d[íi]as/i],
+ c4:[SENAL.riesgoOdependencia,SENAL.areas,/no aplica|no hay ning[uú]n riesgo|no identifico riesgos/i]
+};
+function chequeosGuia(id,texto){
+  return (GUIA_CHECK[id]||[]).map(re=>re.test(texto||""));
+}
 
 /* ---- PRD de ejemplo ---- */
 const PRD_V2=`Alertas de consumo en tiempo real
@@ -1096,17 +1107,21 @@ const NIVELES=[
 function nivelDe(p){return NIVELES.find(n=>p>=n.min)||NIVELES[3];}
 const SQUADS=["Money Movements","Card Experience","Segment-led Solutions"];
 /* El ciclo manda sobre la calificación: una priorizada ya no se juzga por su puntaje */
+/* "k" es el valor guardado (no cambia, por compatibilidad con datos existentes);
+   "t" es el texto que se muestra — se separan para no confundir el estado de flujo
+   "En la mesa" con la calificación de calidad "Lista para la mesa" (colores distintos
+   a propósito: este es flujo, NIVELES es calidad). */
 const CICLOS=[
- {k:"Borrador",c:"var(--muted)",bg:"var(--paper)",d:"Todavía la estás trabajando"},
- {k:"En la mesa",c:"#5601D9",c2:"#9B6BFF",bg:"#EEE3FF",d:"Ya la llevaste a priorización"},
- {k:"Priorizada",c:"#166C43",c2:"#3E9E6E",bg:"#E1F1E8",d:"La mesa la aprobó y entra al backlog"},
- {k:"Descartada",c:"#5C6370",c2:"#9B9CA9",bg:"#EEEFF3",d:"La mesa decidió no hacerla"}
+ {k:"Borrador",t:"Borrador",c:"var(--muted)",bg:"var(--paper)",d:"Todavía la estás trabajando"},
+ {k:"En la mesa",t:"Presentada",c:"#5601D9",c2:"#9B6BFF",bg:"#EEE3FF",d:"Ya la llevaste a priorización"},
+ {k:"Priorizada",t:"Priorizada",c:"#166C43",c2:"#3E9E6E",bg:"#E1F1E8",d:"La mesa la aprobó y entra al backlog"},
+ {k:"Descartada",t:"Descartada",c:"#5C6370",c2:"#9B9CA9",bg:"#EEEFF3",d:"La mesa decidió no hacerla"}
 ];
 function cicloDe(e){return CICLOS.find(c=>c.k===(e.ciclo||"Borrador"))||CICLOS[0];}
 function estadoDe(e){
   const cy=e.ciclo||"Borrador";
   if(cy==="Priorizada"||cy==="Descartada"||cy==="En la mesa"){
-    const c=cicloDe(e);return{t:c.k,c:c.c,c2:c.c2||c.c,bg:c.bg,d:c.d,clave:cy.toLowerCase().replace(/ /g,"")};
+    const c=cicloDe(e);return{t:c.t,c:c.c,c2:c.c2||c.c,bg:c.bg,d:c.d,clave:cy.toLowerCase().replace(/ /g,"")};
   }
   if(typeof e.puntaje!=="number")return{t:"Sin terminar",c:"var(--faint)",c2:"#C9CAD4",bg:"var(--paper)",d:"Quedó a medias. Ábrela para retomarla.",clave:"amedias"};
   const n=nivelDe(e.puntaje);return{t:n.t,c:n.c,c2:n.c2,bg:n.bg,d:n.d,clave:n.clave};
@@ -1119,7 +1134,7 @@ const FILTROS_CALIDAD=[
  {k:"cruda",t:"Todavía son ideas"}
 ];
 const FILTROS_DECISION=[
- {k:"enlamesa",t:"En la mesa"},
+ {k:"enlamesa",t:"Presentadas"},
  {k:"priorizada",t:"Priorizadas"},
  {k:"descartada",t:"Descartadas"}
 ];
@@ -1199,7 +1214,7 @@ function cuadranteDe(p,r){
   const alta=r&&r.indice>=15, solida=p>=60;
   if(!r)return{t:"Sin priorizar todavía",d:"Faltan los números para estimar la prioridad. Complétalos abajo."};
   if(solida&&alta)return{t:"Lista para priorizar",d:"Está sustentada y los números la respaldan. Esta es la conversación que la mesa quiere tener."};
-  if(!solida&&alta)return{t:"Sustentar antes",d:"Los números prometen, pero la sustentación no acompaña. Es la más peligrosa: se prioriza por entusiasmo."};
+  if(!solida&&alta)return{t:"Sustentar antes",d:"Suena prometedora, pero todavía no está bien argumentada. Antes de priorizarla, complétala — si no, se estaría decidiendo por entusiasmo y no por evidencia."};
   if(solida&&!alta)return{t:"Bien armada, impacto acotado",d:"Está bien construida, pero mueve poco. Pregunta si vale el espacio que ocupa."};
   return{t:"Todavía no",d:"Ni la sustentación ni los números la sostienen. No gastes tiempo de mesa en esto aún."};
 }
@@ -1570,6 +1585,7 @@ function critHTML(c,i){
   const col={sustentado:"var(--morado)","débil":"var(--naranja)",ausente:"var(--grisOsc)"}[c.estado];
   const v=S.exp.votos[c.id];
   const f=(S.exp.fortalecer||{})[c.id]||{};
+  const checks=chequeosGuia(c.id,S.exp.prd);
   return `<div class="crit">
     <div class="top"><strong>${c.nombre}</strong><span class="chip s-${c.estado==="débil"?"debil":c.estado}">${c.estado}</span></div>
     <div class="barra"><i style="width:${pct}%;background:${col}"></i></div>
@@ -1580,24 +1596,29 @@ function critHTML(c,i){
       :`<div class="voto">
         <button onclick="votar('${c.id}','ok')">De acuerdo</button>
         <button onclick="votar('${c.id}','no')">No estoy de acuerdo</button>
-        ${c.estado!=="sustentado"?`<button onclick="verEjemplo('${c.id}')">¿Cómo se ve bien?</button>
-        <button onclick="toggleFortalecer('${c.id}')">Fortalecer este criterio</button>`:""}</div>`}
-    ${S.exp.ejemplos&&S.exp.ejemplos[c.id]?`<div class="ejemplo">
+        ${c.estado!=="sustentado"?`<button onclick="toggleFortalecer('${c.id}')">¿Cómo se ve bien?</button>`:""}</div>`}
+    ${f.abierto?`<div class="ejemplo">
       <div class="et">Qué debe tener para quedar sustentado</div>
-      <ul class="lista" style="margin-top:6px">${GUIA[c.id].map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
-      </div>`:""}
-    ${f.abierto?`<div class="fortalecer" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--paper)">
-      <textarea id="fort-${c.id}" rows="3" placeholder="Escríbelo como te salga, no hace falta que suene formal"
-        oninput="S.exp.fortalecer['${c.id}'].texto=this.value">${esc(f.texto||"")}</textarea>
-      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-        <button class="btn sec mini" style="padding:8px 14px" ${f.puliendo?"disabled":""} onclick="pulirFortalecer('${c.id}')">${f.puliendo?"Puliendo…":"Pulir con IA"}</button>
-        <button class="btn mini" style="padding:8px 14px" onclick="guardarFortalecer('${c.id}')">Guardar y reevaluar</button>
+      <ul class="lista" style="margin-top:6px;list-style:none;padding-left:0">
+        ${GUIA[c.id].map((x,ix)=>`<li style="display:flex;gap:8px;align-items:flex-start">
+          <span style="flex:0 0 16px;color:${checks[ix]?"#1E7A4B":"var(--faint)"}">${checks[ix]?"✓":"○"}</span>
+          <span${checks[ix]?' style="color:#1E7A4B"':""}>${esc(x)}</span></li>`).join("")}
+      </ul>
       </div>
-      ${f.aviso?`<div style="font-size:12px;color:var(--muted);margin-top:7px">${esc(f.aviso)}</div>`:""}
+    <div class="fortalecer" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--paper)">
+      <textarea id="fort-${c.id}" rows="3" placeholder="Escríbelo como te salga, no hace falta que suene formal"
+        oninput="S.exp.fortalecer['${c.id}'].texto=this.value;S.exp.fortalecer['${c.id}'].pulido=false">${esc(f.texto||"")}</textarea>
+      <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn sec mini" style="padding:9px 16px;display:inline-flex;align-items:center;justify-content:center" ${f.puliendo||f.pulido?"disabled":""} onclick="pulirFortalecer('${c.id}')">${f.puliendo?"Puliendo…":f.pulido?"Pulido con IA ✓":"Pulir con IA"}</button>
+        <button class="btn mini" style="padding:9px 16px;display:inline-flex;align-items:center;justify-content:center" onclick="guardarFortalecer('${c.id}')">Guardar y reevaluar</button>
+      </div>
+      ${f.aviso?`<div style="font-size:12.5px;color:var(--tinta);background:var(--lilaSuave);border-radius:10px;padding:9px 12px;margin-top:9px">${esc(f.aviso)}</div>`:""}
     </div>`:""}
   </div>`;
 }
-/* ---------- Fortalecer un criterio sin salir de la Lectura ni reiniciar el flujo ---------- */
+/* ---------- Fortalecer un criterio sin salir de la Lectura ni reiniciar el flujo ----------
+   Un solo botón ("¿Cómo se ve bien?") abre el checklist y el campo para arreglarlo juntos:
+   son la misma intención (entender qué falta → resolverlo ahí mismo). */
 function toggleFortalecer(id){
   S.exp.fortalecer=S.exp.fortalecer||{};
   const cur=S.exp.fortalecer[id]||{texto:"",abierto:false};
@@ -1611,16 +1632,20 @@ function guardarFortalecer(id){
   if(t.length<25){S.exp.fortalecer[id]={...f,aviso:"Cuéntame un poco más — con esto todavía no alcanzo a reevaluar."};render();return;}
   const c=S.exp.criterios.find(x=>x.id===id);
   if(!c)return;
+  const antes=c.estado;
   const fsr=frases(t+" ");
   const sub=EVAL[id](t,fsr.length?fsr:[t]);
   const orden={ausente:0,"débil":1,sustentado:2};
-  if(orden[sub.estado]>=orden[c.estado])Object.assign(c,{estado:sub.estado,cita:corta(t),nota:sub.nota});
+  if(orden[sub.estado]>=orden[antes])Object.assign(c,{estado:sub.estado,cita:corta(t),nota:sub.nota});
   const p=(S.exp.preguntas||[]).find(q=>q.criterio===id);
   if(p){p.respuesta=t;p.nolose=false;}
   S.exp.puntaje=puntajeDe(S.exp.criterios,S.exp.admisibilidad);
   S.exp.semaforo=semaforoDe(S.exp.criterios,S.exp.noEvaluable);
   S.exp.lectura=lecturaDe(S.exp.criterios,S.exp.semaforo);
-  S.exp.fortalecer[id]={texto:t,abierto:false,aviso:"Quedó actualizado con lo que agregaste."};
+  const aviso=orden[c.estado]>orden[antes]
+    ?`Estaba "${antes}" → ahora quedó "${c.estado}". Se actualizó arriba.`
+    :`Sigue en "${c.estado}": esto todavía no fue suficiente para subir de nivel.`;
+  S.exp.fortalecer[id]={texto:t,abierto:true,aviso};
   sincronizar();render();
 }
 /* Asistente de redacción: solo pule forma, nunca agrega ni quita ideas. El PM revisa
@@ -1724,7 +1749,7 @@ function vLectura(e,msg){
         :sinDatos?`<p>No tengo con qué comparar todavía. Carga lo que hace cada squad, o pasa más iniciativas por aquí: cada una que evalúes mejora esta detección.</p>`
                 :`<p>Comparé contra todo lo que hay cargado y contra las iniciativas que ya pasaron por aquí. Ninguna resuelve lo mismo.</p>`}
       ${sinDatos?"":`<em>${esc(e.cobertura||"")}</em>`}
-      ${corpusActual().length?"":`<button class="btn sec mini" onclick="ir('ini')">Cargar las iniciativas de los squads</button>`}
+      ${corpusActual().length?"":`<button class="btn sec mini" onclick="S.volverExp=S.exp.id;ir('ini')">Cargar las iniciativas de los squads</button>`}
     </div>
   </section>`;
 
@@ -1739,19 +1764,22 @@ function vLectura(e,msg){
 }
 
 function cajaPreguntar(){
+  const criterios=(S.exp&&S.exp.criterios)||[];
+  const orden={ausente:0,"débil":1,sustentado:2};
+  const peor=criterios.slice().sort((a,b)=>orden[a.estado]-orden[b.estado])[0];
+  const sugPregunta=peor&&peor.estado!=="sustentado"
+    ?`¿Por qué marcaste así ${peor.nombre.toLowerCase()}?`:null;
   return `<div class="pregunta">
     <label for="qbox">Ahora pregúntame tú</label>
     <p class="sub">Antes de entregar: si algo de lo que te marqué no te cuadra, dímelo y te explico de dónde salió.</p>
     <div class="fila">
-      <input id="qbox" type="text" placeholder="Por ejemplo: ¿por qué dices que mi impacto medible está débil?"
+      <input id="qbox" type="text" placeholder="Por ejemplo: ¿por qué dices que mi ${peor?peor.nombre.toLowerCase():"impacto estimado"} está débil?"
         onkeydown="if(event.key==='Enter')preguntar()">
       <button class="btn" onclick="preguntar()">Preguntar</button>
     </div>
-    <div class="sug">
-      <button class="btn link" onclick="preguntarEso('¿Por qué marcaste así impacto medible?')">¿Por qué impacto medible?</button>
-      <button class="btn link" onclick="preguntarEso('¿Qué significa el semáforo?')">¿Qué significa el semáforo?</button>
-      <button class="btn link" onclick="preguntarEso('¿Me ayudas a escribirlo?')">¿Me ayudas a escribirlo?</button>
-    </div></div>`;
+    ${sugPregunta?`<div class="sug">
+      <button class="btn link" onclick="preguntarEso('${esc(sugPregunta)}')">¿Por qué ${peor.nombre.toLowerCase()}?</button>
+    </div>`:""}</div>`;
 }
 function hiloHTML(e,msg){
   let h="";
@@ -1802,7 +1830,9 @@ function vPreguntas(e,msg){
       <button class="btn link" onclick="nolose(${i})">${p.nolose?"Quiero responderla":"No lo sé"}</button>
       <div class="nav">
         ${i>0?`<button class="btn sec" onclick="S.exp.qi=${i-1};render()">Anterior</button>`:""}
-        ${i<P.length-1?`<button class="btn" onclick="S.exp.qi=${i+1};render()">Siguiente</button>`:""}
+        ${i<P.length-1
+          ?`<button class="btn" onclick="S.exp.qi=${i+1};render()">Siguiente</button>`
+          :`<button class="btn" ${listo?'onclick="revisar()"':"disabled"}>${listo?"Entregar para calificar":"Responde todas para entregar"}</button>`}
       </div>
     </div>
   </div>
@@ -1833,6 +1863,13 @@ function vInforme(e,msg){
 }
 
 /* ---------- Veredicto con calificación ---------- */
+/* Leyenda fija de qué significa cada banda — reemplaza tener que preguntarle al chat
+   "¿qué significa el semáforo?" (ver backlog: mejor estático que ida y vuelta de chat). */
+function leyendaNivelesHTML(){
+  return `<div style="font-size:12px;color:var(--muted);margin-top:9px;display:flex;gap:12px;flex-wrap:wrap">
+    ${NIVELES.map(n=>`<span><b style="color:${n.c}">●</b> ${n.t.toLowerCase()}</span>`).join("")}
+  </div>`;
+}
 function veredictoHTML(e,grande){
   if(typeof e.puntaje!=="number")return semHTML(e.semaforo,e.lectura,grande);
   const n=nivelDe(e.puntaje);
@@ -1842,7 +1879,7 @@ function veredictoHTML(e,grande){
     </div>
     <div><b style="color:${n.c}">${n.t}</b>
     <span style="font-size:${grande?14.5:13}px;color:#4A4B58">${esc(e.lectura||n.d)}</span>
-    ${grande?`<small>${n.d} Esta calificación mide qué tan sustentada está la iniciativa, no qué tan prioritaria es.</small>`:''}</div>
+    ${grande?`<small>${n.d} Esta calificación mide qué tan sólida está la iniciativa, no qué tan prioritaria es.</small>${leyendaNivelesHTML()}`:''}</div>
   </div>`;
 }
 
@@ -1858,7 +1895,7 @@ function fichaHTML(e){
     </div>
     <div class="campos">
       <label>Alcance
-        <div class="cx"><input id="riceAlcance" type="number" min="0" max="100" value="${pr.alcance===null?"":pr.alcance}"
+        <div class="cx"><input id="riceAlcance" type="text" inputmode="numeric" pattern="[0-9]*" value="${pr.alcance===null?"":pr.alcance}"
           oninput="setRice('alcance',this.value)"><span>% de usuarios</span></div>
         <em>${pr.sugerido&&pr.sugerido.alcance?"detectado en lo que escribiste, confírmalo":"no lo encontré en lo que escribiste"}</em></label>
       <label>Impacto
@@ -1869,7 +1906,7 @@ function fichaHTML(e){
         <em>${pr.sugerido&&pr.sugerido.impacto?"según el criterio de Impacto estimado, confírmalo":"cuánto mueve la métrica a quien alcanza"}</em></label>
       <label>Confianza
         <div class="fijo" style="color:var(--morado)">${pr.confianza.valor}%</div>
-        <em>${pr.confianza.fuente}</em></label>
+        <em>${pr.confianza.fuente} — sale del criterio Impacto estimado: sustentado 80%, débil 50%, ausente 20%.</em></label>
       <label>Esfuerzo
         <select id="riceEsfuerzo" onchange="setRice('esfuerzo',this.value)">
           ${ESFUERZOS.map(i=>`<option value="${i.v}" ${pr.esfuerzo==i.v?"selected":""}>${i.t} (${i.v})</option>`).join("")}
@@ -1882,7 +1919,10 @@ function fichaHTML(e){
 }
 function setRice(campo,valor){
   const pr=S.exp.prioridad=S.exp.prioridad||prioridadDe(S.exp.prd,S.exp.criterios);
-  if(campo==="alcance")pr.alcance=valor===""?null:Math.max(0,Math.min(100,parseFloat(valor)));
+  if(campo==="alcance"){
+    const limpio=(valor||"").replace(/[^0-9]/g,"");
+    pr.alcance=limpio===""?null:Math.max(0,Math.min(100,parseInt(limpio,10)));
+  }
   if(campo==="impacto")pr.impacto=valor===""?null:parseFloat(valor);
   if(campo==="esfuerzo")pr.esfuerzo=parseFloat(valor);
   sincronizar();render();
@@ -1955,11 +1995,10 @@ function matrizHTML(){
   return `<section class="matriz">
     <div class="th">
       <h2 class="subt">Dónde cae cada iniciativa</h2>
-      <span class="hint">Toca una burbuja para leerla ·
-        <button class="btn link mini" onclick="S.verLey=!S.verLey;render()" style="padding:0">${S.verLey?"ocultar la guía":"ver qué significa cada eje"}</button></span>
+      <span class="hint">Toca una burbuja para leerla</span>
     </div>
-    <div class="mgrid${S.verLey?"":" singuia"}">
-      ${S.verLey?`<div class="minstr">
+    <div class="mgrid">
+      <div class="minstr">
         <div class="ins"><div class="ic ejes"><span></span><span></span></div>
           <div><b>Los dos ejes</b><p>Horizontal, el esfuerzo. Vertical, el valor que promete. Arriba a la izquierda es lo que más conviene.</p></div></div>
         <div class="ins"><div class="ic tam"><i class="g"></i><i class="p"></i></div>
@@ -1968,7 +2007,7 @@ function matrizHTML(){
           <div><b>El color</b><p>Es la calificación: ${NIVELES.map(n=>`<span style="color:${n.c}">${n.t.toLowerCase()}</span>`).join(", ")}.</p></div></div>
         <div class="ins"><div class="ic pun"></div>
           <div><b>Borde punteado</b><p>Posición estimada por el agente. Declara alcance e impacto para ubicarla con precisión.</p></div></div>
-      </div>`:""}
+      </div>
       <div class="mwrap">
         <svg viewBox="0 0 ${W} ${H}" class="grafo" role="img" aria-label="Matriz de valor contra esfuerzo">
           <defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1">
@@ -2185,8 +2224,6 @@ function actaHTML(e){
     <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
       <button class="btn" onclick="guardar()">Guardar en el tablero</button>
       <button class="btn sec" onclick="imprimirActa()">Imprimir o guardar en PDF</button>
-      <button class="btn sec" onclick="copiarActa()">Copiar el informe</button>
-      <button class="btn link" onclick="descargarActa()">Descargar el informe</button>
     </div></div>`;
 }
 
@@ -2241,7 +2278,7 @@ function vExp(){
         </div>
         <div style="font-size:13px;color:var(--muted);margin-top:6px;padding-left:5px">${esc(e.lectura||sm.d||"")}</div>
         <div class="ciclo">
-          ${CICLOS.map(x=>x.k).map(v=>`<button class="${(e.ciclo||"Borrador")===v?"on":""}" onclick="fijarEstado('${e.id}','${v}')">${v}</button>`).join("")}
+          ${CICLOS.map(x=>`<button class="${(e.ciclo||"Borrador")===x.k?"on":""}" onclick="fijarEstado('${e.id}','${x.k}')">${x.t}</button>`).join("")}
           ${(e.ciclo==="Priorizada"||e.ciclo==="Descartada")?`<input placeholder="¿Qué decidió la mesa y por qué?" value="${esc(e.decision||"")}" onchange="fijarDecision('${e.id}',this.value)">`:""}
         </div>
         <div class="acciones">
@@ -2421,7 +2458,7 @@ function importarCorpus(f){
 const VISTAS_SQ=[
  {k:"todas",t:"Todas"},
  {k:"idea",t:"En construcción",d:e=>(e.ciclo||"Borrador")==="Borrador"},
- {k:"mesa",t:"Sobre la mesa",d:e=>e.ciclo==="En la mesa"},
+ {k:"mesa",t:"Presentadas",d:e=>e.ciclo==="En la mesa"},
  {k:"prior",t:"Priorizadas",d:e=>e.ciclo==="Priorizada"},
  {k:"desc",t:"Descartadas",d:e=>e.ciclo==="Descartada"}
 ];
@@ -2513,7 +2550,8 @@ function docVerHTML(e){
 }
 function vIniciativas(){
   const n=S.corpus.length;
-  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+  return `${S.volverExp?`<div class="avisos"><div>Tenías una evaluación en curso. <button class="btn link mini" onclick="const id=S.volverExp;S.volverExp=null;abrir(id)">← Volver a tu evaluación</button></div></div>`:""}
+  <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
     <h1 class="tituloV" style="font-size:24px;letter-spacing:-.02em">Iniciativas por squad</h1>
     </div>
   <p style="font-size:14px;color:var(--muted);max-width:66ch;margin:10px 0 0">
@@ -2621,18 +2659,6 @@ function actaTexto(e){
   L.push("Generado por el Árbitro de priorización de Spin. La evaluación se apoya solo en el texto entregado y en las iniciativas cargadas en la herramienta.");
   return L.join("\n");
 }
-function copiarActa(){
-  const t=actaTexto(S.exp);
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(t).then(()=>set({aviso:"Informe copiado. Pégalo donde lo necesites."}),
-      ()=>set({aviso:"No pude copiar. Descárgalo en su lugar."}));
-  }else set({aviso:"No pude copiar el informe. Descárgalo y lo tienes igual."});
-}
-function descargarActa(){
-  const b=new Blob([actaTexto(S.exp)],{type:"text/markdown"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(b);
-  a.download=(S.exp.nombre||"acta").replace(/[^\w\-]+/g,"_")+".md";a.click();
-}
 function imprimirActa(){
   const z=$("#areaImpresion");
   z.innerHTML=`<h1 style="font-family:var(--display)">Informe de evaluación</h1>
@@ -2688,7 +2714,6 @@ function pintarProgreso(){
   if(b)b.style.width=(t?r/t*100:0)+"%";
   if(btn)btn.disabled=r!==t;
 }
-function verEjemplo(id){S.exp.ejemplos=S.exp.ejemplos||{};S.exp.ejemplos[id]=!S.exp.ejemplos[id];sincronizar();render();}
 function preguntarEso(t){const i=$("#qbox");if(i){i.value=t;}preguntar();}
 async function preguntar(){
   const i=$("#qbox");if(!i)return;
