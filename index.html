@@ -706,10 +706,10 @@ const Fire={
    ============================================================ */
 
 const CORPUS_EJEMPLO=[
- {id:"MM-01",squad:"Money Movement",nombre:"Transferencias programadas",objetivo:"Subir frecuencia de uso mensual",estado:"En construcción",kw:["transferencia","programad","recurrente"]},
- {id:"MM-02",squad:"Money Movement",nombre:"Alertas de envío fallido",objetivo:"Reducir contactos a soporte por pagos",estado:"En diseño",kw:["envío fallido","alerta","notificaci","push"]},
- {id:"MM-03",squad:"Money Movement",nombre:"Límites dinámicos por perfil de riesgo",objetivo:"Reducir fricción en montos altos",estado:"Priorizada",kw:["aumento de límite","perfil de riesgo","límite de transferencia"]},
- {id:"MM-04",squad:"Money Movement",nombre:"Historial unificado de movimientos",objetivo:"Reducir contactos a soporte",estado:"En definición",kw:["historial unificado","consulta de movimientos"]},
+ {id:"MM-01",squad:"Money Movements",nombre:"Transferencias programadas",objetivo:"Subir frecuencia de uso mensual",estado:"En construcción",kw:["transferencia","programad","recurrente"]},
+ {id:"MM-02",squad:"Money Movements",nombre:"Alertas de envío fallido",objetivo:"Reducir contactos a soporte por pagos",estado:"En diseño",kw:["envío fallido","alerta","notificaci","push"]},
+ {id:"MM-03",squad:"Money Movements",nombre:"Límites dinámicos por perfil de riesgo",objetivo:"Reducir fricción en montos altos",estado:"Priorizada",kw:["aumento de límite","perfil de riesgo","límite de transferencia"]},
+ {id:"MM-04",squad:"Money Movements",nombre:"Historial unificado de movimientos",objetivo:"Reducir contactos a soporte",estado:"En definición",kw:["historial unificado","consulta de movimientos"]},
  {id:"CX-01",squad:"Card Experience",nombre:"Alertas de consumo en tiempo real",objetivo:"Subir activación de tarjeta",estado:"En definición",kw:["consumo","tarjeta","alerta"]},
  {id:"CX-02",squad:"Card Experience",nombre:"Congelar y descongelar tarjeta",objetivo:"Reducir reposiciones",estado:"Priorizada",kw:["congelar","bloquear la tarjeta"]},
  {id:"CX-03",squad:"Card Experience",nombre:"Rediseño del detalle de movimiento",objetivo:"Reducir contactos a soporte",estado:"En diseño",kw:["detalle del movimiento","comercio"]},
@@ -789,12 +789,21 @@ const BANCO={
  c4:["¿Hay algún riesgo conocido, o dependes de otro equipo o squad para que esto salga? Si no hay, dilo y seguimos.","Nombras a alguien más, pero ¿qué riesgo o dependencia implica exactamente?"]
 };
 
-/* ---- Cómo se ve un criterio bien resuelto, con el estándar de Spin ---- */
+/* ---- Ejemplo real para "Usar una iniciativa de ejemplo" (no se muestra como referencia
+   de "cómo se ve bien" — ver GUIA, que es estructural y no amarrada a una iniciativa). ---- */
 const EJEMPLO={
  c1:"Si el usuario está en una tienda que en esa geolocalización recibe muchos SPEI IN o P2P IN y abre su app, le recomendamos directamente la transferencia a esa cuenta. La app detecta el patrón por atrás y sugiere un modal en el home.",
  c2:"El patrón se detecta hoy en 55,616 usuarios de SbO (población mensual), con una tasa de transacciones no generadas de 10.11% — estimado de 5,623 transacciones adicionales al mes.",
  c3:"Fase 1: componente en home y deeplink. Fase 2: asistente dentro de la app. Esfuerzo TI medio, ya existen los modelos NBA e Inflow en los que apoyarse.",
  c4:"Depende de que Riesgos valide el patrón de detección, y es posible que requiera un research previo porque el equipo de tarjetas levantó un riesgo similar en otro flujo."
+};
+/* ---- Qué debe tener cada criterio para quedar sustentado (checklist estructural,
+   no un ejemplo narrativo de una iniciativa concreta — ver backlog). ---- */
+const GUIA={
+ c1:["Qué es, en una frase, sin jerga técnica.","Para quién y en qué momento se activa.","Qué hace el sistema o el usuario, paso a paso, a alto nivel.","Dónde termina — qué NO cubre, si aplica."],
+ c2:["A quién le pasa hoy y cuántos son (población o volumen).","Qué tan seguido pasa (frecuencia o tasa).","El resultado que esperas mover, con una cifra aproximada."],
+ c3:["Tamaño relativo del esfuerzo (chico, mediano, grande) o un sizing.","Si toca más de un equipo, sistema o fase.","Una referencia de tiempo, si la tienes (semanas, sprints)."],
+ c4:["Un riesgo concreto que podría complicar la ejecución.","De qué otro equipo o sistema depende, si depende de alguno.","Si de verdad no aplica ninguno, decirlo explícitamente."]
 };
 
 /* ---- PRD de ejemplo ---- */
@@ -1085,7 +1094,7 @@ const NIVELES=[
   d:"Está en su etapa más temprana. Abajo te digo qué hace falta para que crezca."}
 ];
 function nivelDe(p){return NIVELES.find(n=>p>=n.min)||NIVELES[3];}
-const SQUADS=["Money Movement","Card Experience","Segment-led Solutions"];
+const SQUADS=["Money Movements","Card Experience","Segment-led Solutions"];
 /* El ciclo manda sobre la calificación: una priorizada ya no se juzga por su puntaje */
 const CICLOS=[
  {k:"Borrador",c:"var(--muted)",bg:"var(--paper)",d:"Todavía la estás trabajando"},
@@ -1384,11 +1393,10 @@ function vInicio(){
     <div>
       <span class="kicker">Desde la idea hasta la mesa <b>·</b> Spin</span>
       <h1>Trae tu idea como esté y te digo qué le falta</h1>
-      <p>No hace falta que esté terminada. Escribe tu iniciativa como la contarías en voz alta,
-      aunque esté a medias, y te digo qué tiene, qué le falta y qué preguntas responder para
-      completarla. La vara sale del estándar real de Spin. No decido si se hace ni en qué orden:
-      eso sigue siendo de la mesa. Lo que hago es ayudarte a visualizar su prioridad para que la
-      decisión sea más fácil de tomar.</p>
+      <p>No hace falta que esté terminada: cuéntala como la tengas y te digo qué le falta, con
+      el mismo estándar que usa Spin. No decido si se hace ni en qué orden: eso sigue siendo de
+      la mesa. Lo que hago es ayudarte a visualizar su prioridad para que la decisión sea más
+      fácil de tomar.</p>
     </div>
     <div class="heroArt">${ILUS.hero()}</div>
   </div>
@@ -1505,7 +1513,7 @@ function actualizarCampo(campo,valor){
 function usarEjemplo(){
   S.campos={tipo:"Nuevo",descripcion:EJEMPLO.c1,impacto:EJEMPLO.c2,esfuerzo:EJEMPLO.c3,riesgos:EJEMPLO.c4};
   S.doc=textoDesdeCampos(S.campos);
-  S.meta={iniciativa:"Sugerencia por geolocalización",squad:"Money Movement",autor:S.meta.autor};
+  S.meta={iniciativa:"Sugerencia por geolocalización",squad:"Money Movements",autor:S.meta.autor};
   render();
 }
 function vSeleccionMulti(){
@@ -1561,6 +1569,7 @@ function critHTML(c,i){
   const pct={sustentado:100,"débil":55,ausente:12}[c.estado];
   const col={sustentado:"var(--morado)","débil":"var(--naranja)",ausente:"var(--grisOsc)"}[c.estado];
   const v=S.exp.votos[c.id];
+  const f=(S.exp.fortalecer||{})[c.id]||{};
   return `<div class="crit">
     <div class="top"><strong>${c.nombre}</strong><span class="chip s-${c.estado==="débil"?"debil":c.estado}">${c.estado}</span></div>
     <div class="barra"><i style="width:${pct}%;background:${col}"></i></div>
@@ -1571,12 +1580,68 @@ function critHTML(c,i){
       :`<div class="voto">
         <button onclick="votar('${c.id}','ok')">De acuerdo</button>
         <button onclick="votar('${c.id}','no')">No estoy de acuerdo</button>
-        ${c.estado!=="sustentado"?`<button onclick="verEjemplo('${c.id}')">¿Cómo se ve bien?</button>`:""}</div>`}
+        ${c.estado!=="sustentado"?`<button onclick="verEjemplo('${c.id}')">¿Cómo se ve bien?</button>
+        <button onclick="toggleFortalecer('${c.id}')">Fortalecer este criterio</button>`:""}</div>`}
     ${S.exp.ejemplos&&S.exp.ejemplos[c.id]?`<div class="ejemplo">
-      <div class="et">Ejemplo genérico · no está escrito para tu iniciativa</div>
-      ${esc(EJEMPLO[c.id])}
-      <div class="pie">No te lo redacto: si yo escribo tu iniciativa, dejo de poder auditarla. Esto es el nivel de concreción que hace falta.</div></div>`:""}
+      <div class="et">Qué debe tener para quedar sustentado</div>
+      <ul class="lista" style="margin-top:6px">${GUIA[c.id].map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+      </div>`:""}
+    ${f.abierto?`<div class="fortalecer" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--paper)">
+      <textarea id="fort-${c.id}" rows="3" placeholder="Escríbelo como te salga, no hace falta que suene formal"
+        oninput="S.exp.fortalecer['${c.id}'].texto=this.value">${esc(f.texto||"")}</textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn sec mini" style="padding:8px 14px" ${f.puliendo?"disabled":""} onclick="pulirFortalecer('${c.id}')">${f.puliendo?"Puliendo…":"Pulir con IA"}</button>
+        <button class="btn mini" style="padding:8px 14px" onclick="guardarFortalecer('${c.id}')">Guardar y reevaluar</button>
+      </div>
+      ${f.aviso?`<div style="font-size:12px;color:var(--muted);margin-top:7px">${esc(f.aviso)}</div>`:""}
+    </div>`:""}
   </div>`;
+}
+/* ---------- Fortalecer un criterio sin salir de la Lectura ni reiniciar el flujo ---------- */
+function toggleFortalecer(id){
+  S.exp.fortalecer=S.exp.fortalecer||{};
+  const cur=S.exp.fortalecer[id]||{texto:"",abierto:false};
+  S.exp.fortalecer[id]={...cur,abierto:!cur.abierto};
+  render();
+}
+function guardarFortalecer(id){
+  S.exp.fortalecer=S.exp.fortalecer||{};
+  const f=S.exp.fortalecer[id]||{};
+  const t=(f.texto||"").trim();
+  if(t.length<25){S.exp.fortalecer[id]={...f,aviso:"Cuéntame un poco más — con esto todavía no alcanzo a reevaluar."};render();return;}
+  const c=S.exp.criterios.find(x=>x.id===id);
+  if(!c)return;
+  const fsr=frases(t+" ");
+  const sub=EVAL[id](t,fsr.length?fsr:[t]);
+  const orden={ausente:0,"débil":1,sustentado:2};
+  if(orden[sub.estado]>=orden[c.estado])Object.assign(c,{estado:sub.estado,cita:corta(t),nota:sub.nota});
+  const p=(S.exp.preguntas||[]).find(q=>q.criterio===id);
+  if(p){p.respuesta=t;p.nolose=false;}
+  S.exp.puntaje=puntajeDe(S.exp.criterios,S.exp.admisibilidad);
+  S.exp.semaforo=semaforoDe(S.exp.criterios,S.exp.noEvaluable);
+  S.exp.lectura=lecturaDe(S.exp.criterios,S.exp.semaforo);
+  S.exp.fortalecer[id]={texto:t,abierto:false,aviso:"Quedó actualizado con lo que agregaste."};
+  sincronizar();render();
+}
+/* Asistente de redacción: solo pule forma, nunca agrega ni quita ideas. El PM revisa
+   el resultado en el mismo cuadro antes de decidir si lo guarda. */
+async function pulirConIA(txt){
+  const r=await fetch("/api/pulir",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({txt})});
+  if(!r.ok)throw new Error("sin respuesta");
+  const d=await r.json();
+  return d.texto||null;
+}
+async function pulirFortalecer(id){
+  S.exp.fortalecer=S.exp.fortalecer||{};
+  const f=S.exp.fortalecer[id]||{};
+  const t=(f.texto||"").trim();
+  if(!t)return;
+  S.exp.fortalecer[id]={...f,puliendo:true};render();
+  const pulido=await pulirConIA(t).catch(()=>null);
+  S.exp.fortalecer[id]={...S.exp.fortalecer[id],puliendo:false,texto:pulido||t,
+    aviso:pulido?"Pulí la redacción — revísalo antes de guardar, la idea de fondo no cambió.":"No pude pulirlo ahora mismo. Tu texto no cambió."};
+  render();
 }
 
 function vChat(){
